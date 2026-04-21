@@ -379,10 +379,12 @@ select optgroup {
   bottom: 8px;
   transform: translateX(-50%);
   width: min(760px, calc(100% - 16px));
+  max-width: calc(100vw - 16px);
   border-radius: 14px;
   padding: 8px 10px;
   z-index: 50;
   background: rgba(12, 18, 34, 0.92);
+  overflow: hidden;
 }
 .live-dock-totals {
   display: grid;
@@ -394,9 +396,10 @@ select optgroup {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 6px 8px;
+  min-width: 0;
 }
 .live-dock-totals span { display: block; color: var(--muted); font-size: 11px; line-height: 1.1; }
-.live-dock-totals strong { font-size: 13px; line-height: 1.15; }
+.live-dock-totals strong { font-size: 13px; line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
 .grocery-grid { grid-template-columns: repeat(4, 1fr); }
 .grocery-card h3 { margin-top: 0; font-size: 18px; }
 .price { font-size: 28px; font-weight: 800; margin: 8px 0; color: var(--accent); }
@@ -418,9 +421,19 @@ select optgroup {
   .meal-kcal { white-space: normal; }
   body { padding-bottom: 160px; }
   .live-dock-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .live-dock { width: calc(100% - 12px); padding: 7px 8px; bottom: 6px; }
+  .live-dock {
+    left: 6px;
+    right: 6px;
+    width: auto;
+    max-width: none;
+    transform: none;
+    padding: 7px 8px;
+    bottom: 6px;
+  }
   .live-dock-totals span { font-size: 10px; }
   .live-dock-totals strong { font-size: 12px; }
+  .food-row.row-locked { grid-template-columns: 1fr; }
+  .food-row.row-locked .row-actions { justify-self: start; }
 }
 .section-actions {
   margin-left: auto;
