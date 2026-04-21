@@ -24,16 +24,7 @@ const dockRefs = {
   totalCalories: document.getElementById('totalCaloriesDock'),
   totalProtein: document.getElementById('totalProteinDock'),
   totalCarbs: document.getElementById('totalCarbsDock'),
-  totalFat: document.getElementById('totalFatDock'),
-  calorieBar: document.getElementById('calorieBarDock'),
-  proteinBar: document.getElementById('proteinBarDock'),
-  fatBar: document.getElementById('fatBarDock'),
-  carbsBar: document.getElementById('carbsBarDock'),
-  calorieStatus: document.getElementById('calorieStatusDock'),
-  proteinStatus: document.getElementById('proteinStatusDock'),
-  fatStatus: document.getElementById('fatStatusDock'),
-  carbsStatus: document.getElementById('carbsStatusDock'),
-  feedbackBox: document.getElementById('feedbackBoxDock')
+  totalFat: document.getElementById('totalFatDock')
 };
 
 const TARGETS_STORAGE_KEY = 'dietSiteTargetsV1';
@@ -45,6 +36,17 @@ let foodDb = [];
 let imageModal = null;
 let customMealCounter = 0;
 let altCounter = 0;
+let hasUnsavedChanges = false;
+
+function setHasUnsavedChanges(value) {
+  hasUnsavedChanges = Boolean(value);
+  const saveBtn = document.querySelector('.save-changes-btn');
+  if (saveBtn) saveBtn.hidden = !hasUnsavedChanges;
+}
+
+function markUnsavedChanges() {
+  setHasUnsavedChanges(true);
+}
 
 function round(value) {
   return Math.round(value * 10) / 10;
@@ -226,17 +228,6 @@ function updateUI() {
     dockRefs.totalProtein.textContent = `${totals.protein} g (${shares.protein}%)`;
     dockRefs.totalCarbs.textContent = `${totals.carbs} g (${shares.carbs}%)`;
     dockRefs.totalFat.textContent = `${totals.fat} g (${shares.fat}%)`;
-    dockRefs.calorieBar.style.width = `${Math.min(calPct, 100)}%`;
-    dockRefs.proteinBar.style.width = `${Math.min(proteinPct, 100)}%`;
-    dockRefs.fatBar.style.width = `${Math.min(100, shares.fat)}%`;
-    dockRefs.carbsBar.style.width = `${Math.min(100, shares.carbs)}%`;
-    dockRefs.calorieStatus.textContent = `${calPct}%`;
-    if (proteinRemaining > 0) dockRefs.proteinStatus.textContent = `${proteinPct}% · μένουν ${proteinRemaining} g`;
-    else if (proteinRemaining < 0) dockRefs.proteinStatus.textContent = `${proteinPct}% · +${Math.abs(proteinRemaining)} g`;
-    else dockRefs.proteinStatus.textContent = `${proteinPct}% · στόχος`;
-    dockRefs.fatStatus.textContent = `${shares.fat}%`;
-    dockRefs.carbsStatus.textContent = `${shares.carbs}%`;
-    dockRefs.feedbackBox.textContent = buildFeedback(totals);
   }
 
   updatePrepNotes();
@@ -649,18 +640,31 @@ function createMealCard(mealKey = null, title = null, description = null) {
 function ensureAddMealButton() {
   const mealsPanel = document.querySelector('.panel.glass.meals');
   const head = mealsPanel?.querySelector('.section-head');
-  if (!head || head.querySelector('.add-meal-btn')) return;
+  if (!head) return;
 
-  const actions = document.createElement('div');
-  actions.className = 'section-actions';
+  let actions = head.querySelector('.section-actions');
+  if (!actions) {
+    actions = document.createElement('div');
+    actions.className = 'section-actions';
+    head.appendChild(actions);
+  }
 
-  const addMealBtn = document.createElement('button');
-  addMealBtn.type = 'button';
-  addMealBtn.className = 'btn btn-secondary add-meal-btn';
-  addMealBtn.textContent = '+ Νέο γεύμα';
+  if (!actions.querySelector('.save-changes-btn')) {
+    const saveChangesBtn = document.createElement('button');
+    saveChangesBtn.type = 'button';
+    saveChangesBtn.className = 'btn btn-secondary save-changes-btn';
+    saveChangesBtn.textContent = 'Save Changes';
+    saveChangesBtn.hidden = true;
+    actions.appendChild(saveChangesBtn);
+  }
 
-  actions.appendChild(addMealBtn);
-  head.appendChild(actions);
+  if (!actions.querySelector('.add-meal-btn')) {
+    const addMealBtn = document.createElement('button');
+    addMealBtn.type = 'button';
+    addMealBtn.className = 'btn btn-secondary add-meal-btn';
+    addMealBtn.textContent = '+ Νέο γεύμα';
+    actions.appendChild(addMealBtn);
+  }
 }
 
 function setupMealButtons() {
@@ -738,6 +742,54 @@ function ensureRowWithKey(mealCard, rowKey) {
   return row;
 }
 
+function collectDashboardPayload() {
+  const meals = Array.from(document.querySelectorAll('.meal-card:not(.sweet-card)')).map((card, idx) => {
+    const mealKey = String(card.dataset.meal || `meal-${idx + 1}`).trim();
+    const title = card.querySelector('.meal-top h3')?.textContent?.trim() || mealKey;
+    const description = card.querySelector('.meal-top p')?.textContent?.trim() || '';
+
+    const items = Array.from(card.querySelectorAll('.food-row.editable')).map(row => {
+      if (!row.dataset.rowKey) row.dataset.rowKey = `row-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      return {
+        rowKey: row.dataset.rowKey,
+        foodId: getFoodIdFromRow(row),
+        qty: Number(row.querySelector('.qty-box input')?.value || 0)
+      };
+    }).filter(item => item.foodId);
+
+    return {
+      mealKey,
+      title,
+      description,
+      sortOrder: idx + 1,
+      items
+    };
+  });
+
+  return { meals };
+}
+
+async function saveDashboardChanges(silent = false) {
+  const payload = collectDashboardPayload();
+  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('dashboard_save_failed');
+  setHasUnsavedChanges(false);
+  if (!silent) {
+    const saveBtn = document.querySelector('.save-changes-btn');
+    if (saveBtn) {
+      const original = saveBtn.textContent;
+      saveBtn.textContent = 'Saved';
+      setTimeout(() => {
+        saveBtn.textContent = original;
+      }, 900);
+    }
+  }
+}
+
 async function loadDashboard() {
   const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`);
   if (!response.ok) throw new Error('dashboard_fetch_failed');
@@ -767,7 +819,13 @@ refs.applyTargets?.addEventListener('click', applyTargets);
 document.addEventListener('input', e => {
   const qtyInput = e.target.closest('.food-row.editable .qty-box input');
   if (qtyInput) {
+    markUnsavedChanges();
     updateUI();
+    return;
+  }
+
+  if (e.target.closest('.meal-top .editable-text')) {
+    markUnsavedChanges();
     return;
   }
 
@@ -805,13 +863,21 @@ document.addEventListener('click', e => {
       saveRowForUser(row, foodId).catch(error => console.error('Failed to save row:', error));
     }
     setRowLocked(row, true);
+    markUnsavedChanges();
     updateUI();
+    return;
+  }
+
+  const saveChangesBtn = e.target.closest('.save-changes-btn');
+  if (saveChangesBtn) {
+    saveDashboardChanges().catch(error => console.error('Failed to save dashboard:', error));
     return;
   }
 
   const addFoodBtn = e.target.closest('.add-food-btn');
   if (addFoodBtn) {
     addFoodToMeal(addFoodBtn.closest('.meal-card'));
+    markUnsavedChanges();
     return;
   }
 
@@ -822,6 +888,7 @@ document.addEventListener('click', e => {
     if (sweetCard?.parentElement) sweetCard.parentElement.insertBefore(newMeal, sweetCard);
     else document.querySelector('.panel.glass.meals')?.appendChild(newMeal);
     refreshDbSelectOptions();
+    markUnsavedChanges();
     updateUI();
     return;
   }
@@ -829,6 +896,7 @@ document.addEventListener('click', e => {
   const removeRowBtn = e.target.closest('.row-remove-btn, .remove-row-btn');
   if (removeRowBtn) {
     removeRowBtn.closest('.food-row')?.remove();
+    markUnsavedChanges();
     updateUI();
     return;
   }
@@ -836,6 +904,10 @@ document.addEventListener('click', e => {
   const removeMealBtn = e.target.closest('.remove-meal-btn');
   if (removeMealBtn) {
     removeMealBtn.closest('.meal-card')?.remove();
+    saveDashboardChanges(true).catch(error => {
+      console.error('Failed to auto-save after meal removal:', error);
+      markUnsavedChanges();
+    });
     updateUI();
     return;
   }
@@ -857,6 +929,7 @@ async function initApp() {
 
   updateFoodImages();
   applyTargets();
+  setHasUnsavedChanges(false);
 }
 
 initApp().catch(error => {

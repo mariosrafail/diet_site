@@ -452,6 +452,75 @@ app.post('/api/users/:slug/meal-items', async (req, res) => {
   }
 });
 
+app.put('/api/users/:slug/dashboard', async (req, res) => {
+  const meals = Array.isArray(req.body?.meals) ? req.body.meals : null;
+  if (!meals) {
+    res.status(400).json({ error: 'meals_required' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const userRes = await client.query('SELECT id FROM users WHERE slug = $1', [req.params.slug]);
+    if (!userRes.rows[0]) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ error: 'user_not_found' });
+      return;
+    }
+    const userId = userRes.rows[0].id;
+
+    await client.query(
+      `DELETE FROM user_meal_items i
+       USING user_meals m
+       WHERE i.meal_id = m.id AND m.user_id = $1`,
+      [userId]
+    );
+    await client.query('DELETE FROM user_meals WHERE user_id = $1', [userId]);
+
+    for (let idx = 0; idx < meals.length; idx += 1) {
+      const meal = meals[idx] || {};
+      const mealKey = String(meal.mealKey || '').trim();
+      if (!mealKey) continue;
+
+      const title = String(meal.title || mealKey).trim() || mealKey;
+      const description = String(meal.description || '').trim();
+      const sortOrder = Number.isFinite(Number(meal.sortOrder)) ? Number(meal.sortOrder) : idx + 1;
+
+      const mealIns = await client.query(
+        `INSERT INTO user_meals (user_id, meal_key, title, description, sort_order)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
+        [userId, mealKey, title, description, sortOrder]
+      );
+      const mealId = mealIns.rows[0].id;
+
+      const items = Array.isArray(meal.items) ? meal.items : [];
+      for (const item of items) {
+        const rowKey = String(item?.rowKey || '').trim();
+        const foodId = String(item?.foodId || '').trim();
+        const qty = Number(item?.qty || 0);
+        if (!rowKey || !foodId || !Number.isFinite(qty)) continue;
+
+        await client.query(
+          `INSERT INTO user_meal_items (meal_id, row_key, food_id, qty)
+           VALUES ($1, $2, $3, $4)`,
+          [mealId, rowKey, foodId, qty]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: 'dashboard_write_failed' });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = {
   app,
   ensureSchema

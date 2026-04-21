@@ -20,7 +20,7 @@ body {
   background: radial-gradient(circle at top left, #172445 0%, var(--bg) 35%, #080c17 100%);
   min-height: 100vh;
   overflow-x: hidden;
-  padding-bottom: 290px;
+  padding-bottom: 110px;
 }
 body.modal-open {
   overflow: hidden;
@@ -376,44 +376,27 @@ select optgroup {
 .live-dock {
   position: fixed;
   left: 50%;
-  bottom: 12px;
+  bottom: 8px;
   transform: translateX(-50%);
-  width: min(1200px, calc(100% - 20px));
-  border-radius: 18px;
-  padding: 12px;
+  width: min(760px, calc(100% - 16px));
+  border-radius: 14px;
+  padding: 8px 10px;
   z-index: 50;
   background: rgba(12, 18, 34, 0.92);
-}
-.live-dock-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-#feedbackBoxDock {
-  color: var(--muted);
-  font-size: 12px;
 }
 .live-dock-totals {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
 }
 .live-dock-totals > div {
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 10px;
+  padding: 6px 8px;
 }
-.live-dock-totals span { display: block; color: var(--muted); font-size: 12px; }
-.live-dock-totals strong { font-size: 14px; }
-.live-dock-progress {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
+.live-dock-totals span { display: block; color: var(--muted); font-size: 11px; line-height: 1.1; }
+.live-dock-totals strong { font-size: 13px; line-height: 1.15; }
 .grocery-grid { grid-template-columns: repeat(4, 1fr); }
 .grocery-card h3 { margin-top: 0; font-size: 18px; }
 .price { font-size: 28px; font-weight: 800; margin: 8px 0; color: var(--accent); }
@@ -433,9 +416,11 @@ select optgroup {
   .stat-card strong, .metric-box strong, .total-box strong { font-size: 24px; }
   .meal-top { flex-direction: column; }
   .meal-kcal { white-space: normal; }
-  body { padding-bottom: 360px; }
+  body { padding-bottom: 160px; }
   .live-dock-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .live-dock-progress { grid-template-columns: 1fr; }
+  .live-dock { width: calc(100% - 12px); padding: 7px 8px; bottom: 6px; }
+  .live-dock-totals span { font-size: 10px; }
+  .live-dock-totals strong { font-size: 12px; }
 }
 .section-actions {
   margin-left: auto;
