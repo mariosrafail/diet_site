@@ -20,6 +20,22 @@
   applyTargets: document.getElementById('applyTargets')
 };
 
+const dockRefs = {
+  totalCalories: document.getElementById('totalCaloriesDock'),
+  totalProtein: document.getElementById('totalProteinDock'),
+  totalCarbs: document.getElementById('totalCarbsDock'),
+  totalFat: document.getElementById('totalFatDock'),
+  calorieBar: document.getElementById('calorieBarDock'),
+  proteinBar: document.getElementById('proteinBarDock'),
+  fatBar: document.getElementById('fatBarDock'),
+  carbsBar: document.getElementById('carbsBarDock'),
+  calorieStatus: document.getElementById('calorieStatusDock'),
+  proteinStatus: document.getElementById('proteinStatusDock'),
+  fatStatus: document.getElementById('fatStatusDock'),
+  carbsStatus: document.getElementById('carbsStatusDock'),
+  feedbackBox: document.getElementById('feedbackBoxDock')
+};
+
 const TARGETS_STORAGE_KEY = 'dietSiteTargetsV1';
 const FOODS_API_ENDPOINT = '/api/foods';
 const USER_SLUG = 'konstantinos';
@@ -205,6 +221,24 @@ function updateUI() {
 
   refs.feedbackBox.textContent = buildFeedback(totals);
 
+  if (dockRefs.totalCalories) {
+    dockRefs.totalCalories.textContent = `${totals.calories} kcal`;
+    dockRefs.totalProtein.textContent = `${totals.protein} g (${shares.protein}%)`;
+    dockRefs.totalCarbs.textContent = `${totals.carbs} g (${shares.carbs}%)`;
+    dockRefs.totalFat.textContent = `${totals.fat} g (${shares.fat}%)`;
+    dockRefs.calorieBar.style.width = `${Math.min(calPct, 100)}%`;
+    dockRefs.proteinBar.style.width = `${Math.min(proteinPct, 100)}%`;
+    dockRefs.fatBar.style.width = `${Math.min(100, shares.fat)}%`;
+    dockRefs.carbsBar.style.width = `${Math.min(100, shares.carbs)}%`;
+    dockRefs.calorieStatus.textContent = `${calPct}%`;
+    if (proteinRemaining > 0) dockRefs.proteinStatus.textContent = `${proteinPct}% · μένουν ${proteinRemaining} g`;
+    else if (proteinRemaining < 0) dockRefs.proteinStatus.textContent = `${proteinPct}% · +${Math.abs(proteinRemaining)} g`;
+    else dockRefs.proteinStatus.textContent = `${proteinPct}% · στόχος`;
+    dockRefs.fatStatus.textContent = `${shares.fat}%`;
+    dockRefs.carbsStatus.textContent = `${shares.carbs}%`;
+    dockRefs.feedbackBox.textContent = buildFeedback(totals);
+  }
+
   updatePrepNotes();
   updateMealCalories();
 }
@@ -330,12 +364,58 @@ function ensureDbPickerForRow(row) {
   picker.className = 'db-picker';
   picker.innerHTML = `
     <select class="db-select"><option value="">Επιλογή από βάση</option></select>
-    <button type="button" class="mini-btn db-save-btn">Save</button>
   `;
 
   const altWrap = row.querySelector('.food-alt-wrap');
   if (altWrap) altWrap.before(picker);
   else row.appendChild(picker);
+}
+
+function getFoodIdFromRow(row) {
+  const select = row?.querySelector('.db-select');
+  if (select?.value && foodDb.some(item => item.id === select.value)) return select.value;
+  const labelText = row?.querySelector('.food-main label')?.textContent || '';
+  const byName = foodDb.find(item => toFoodKey(item.name) === toFoodKey(labelText));
+  return byName?.id || null;
+}
+
+function setRowLocked(row, locked) {
+  if (!row) return;
+  row.dataset.locked = locked ? '1' : '0';
+  row.classList.toggle('row-locked', locked);
+
+  const qtyInput = row.querySelector('.qty-box input');
+  if (qtyInput) qtyInput.disabled = locked;
+
+  const dbSelect = row.querySelector('.db-select');
+  if (dbSelect) dbSelect.disabled = locked;
+
+  const editBtn = row.querySelector('.row-edit-btn');
+  const saveBtn = row.querySelector('.row-save-btn');
+  if (editBtn) editBtn.classList.toggle('active', !locked);
+  if (saveBtn) saveBtn.hidden = locked;
+
+  if (locked) closeAlternativeLists();
+}
+
+function ensureRowActions(row) {
+  if (!row || row.querySelector('.row-actions')) return;
+
+  const actions = document.createElement('div');
+  actions.className = 'row-actions';
+  actions.innerHTML = `
+    <button type="button" class="icon-btn row-edit-btn" title="Επεξεργασία" aria-label="Επεξεργασία">✎</button>
+    <button type="button" class="icon-btn row-save-btn" title="Save" aria-label="Save" hidden>💾</button>
+    <button type="button" class="icon-btn danger row-remove-btn" title="Αφαίρεση" aria-label="Αφαίρεση">🗑</button>
+  `;
+  row.appendChild(actions);
+}
+
+function prepareRow(row, locked = true) {
+  if (!row || !row.classList.contains('editable')) return;
+  ensureDbPickerForRow(row);
+  ensureRowActions(row);
+  setRowLocked(row, locked);
 }
 
 function applyFoodEntryToRow(row, food) {
@@ -403,6 +483,7 @@ function closeAlternativeLists(exceptWrap = null) {
 }
 
 function applyAlternative(row, optionText) {
+  if (row?.dataset.locked === '1') return;
   const label = row.querySelector('.food-main label');
   if (label) label.textContent = optionText;
 
@@ -459,6 +540,8 @@ function initAlternativeWrap(wrap) {
 
   toggle.addEventListener('click', e => {
     e.stopPropagation();
+    const row = wrap.closest('.food-row');
+    if (row?.dataset.locked === '1') return;
     const isOpen = wrap.classList.contains('open');
     if (isOpen) {
       closeAlternativeLists();
@@ -472,9 +555,10 @@ function initAlternativeWrap(wrap) {
   });
 
   list.addEventListener('click', e => {
+    const row = wrap.closest('.food-row');
+    if (row?.dataset.locked === '1') return;
     const option = e.target.closest('.alt-option');
     if (!option) return;
-    const row = wrap.closest('.food-row');
     if (row) applyAlternative(row, option.textContent);
     closeAlternativeLists();
   });
@@ -500,12 +584,10 @@ function createNewFoodRow() {
       <small>ανά 100 g</small>
     </div>
     <div class="qty-box"><input type="number" value="100" min="0" step="10"><span>g</span></div>
-    <div class="food-tools">
-      <button type="button" class="remove-row-btn">Αφαίρεση τροφίμου</button>
-    </div>
+    <div class="food-alt-wrap"><span class="alt-title">Εναλλακτικές</span><div class="alt-list"></div></div>
   `;
 
-  ensureDbPickerForRow(row);
+  prepareRow(row, false);
   ensureRowImage(row);
   return row;
 }
@@ -676,6 +758,8 @@ async function loadDashboard() {
       if (select) select.value = item.food.id;
     });
   });
+
+  getEditableRows().forEach(row => prepareRow(row, true));
 }
 
 refs.applyTargets?.addEventListener('click', applyTargets);
@@ -700,25 +784,28 @@ document.addEventListener('click', e => {
     return;
   }
 
-  const dbSaveBtn = e.target.closest('.db-save-btn');
-  if (dbSaveBtn) {
-    const row = dbSaveBtn.closest('.food-row');
-    const select = row?.querySelector('.db-select');
+  const editBtn = e.target.closest('.row-edit-btn');
+  if (editBtn) {
+    const row = editBtn.closest('.food-row');
+    if (row) setRowLocked(row, false);
+    return;
+  }
+
+  const saveBtn = e.target.closest('.row-save-btn');
+  if (saveBtn) {
+    const row = saveBtn.closest('.food-row');
+    if (!row) return;
+
+    const select = row.querySelector('.db-select');
     const food = getFoodById(select?.value);
-    if (row && food) {
-      applyFoodEntryToRow(row, food);
-      saveRowForUser(row, food.id)
-        .then(() => {
-          dbSaveBtn.textContent = 'Saved';
-          setTimeout(() => {
-            dbSaveBtn.textContent = 'Save';
-          }, 1000);
-        })
-        .catch(error => {
-          console.error('Failed to save row:', error);
-        });
-      updateUI();
+    if (food) applyFoodEntryToRow(row, food);
+
+    const foodId = getFoodIdFromRow(row);
+    if (foodId) {
+      saveRowForUser(row, foodId).catch(error => console.error('Failed to save row:', error));
     }
+    setRowLocked(row, true);
+    updateUI();
     return;
   }
 
@@ -739,7 +826,7 @@ document.addEventListener('click', e => {
     return;
   }
 
-  const removeRowBtn = e.target.closest('.remove-row-btn');
+  const removeRowBtn = e.target.closest('.row-remove-btn, .remove-row-btn');
   if (removeRowBtn) {
     removeRowBtn.closest('.food-row')?.remove();
     updateUI();
@@ -762,7 +849,7 @@ async function initApp() {
   setupAlternativeDropdowns();
 
   foodDb = await fetchFoodsFromApi();
-  getEditableRows().forEach(ensureDbPickerForRow);
+  getEditableRows().forEach(row => prepareRow(row, true));
   refreshDbSelectOptions();
   setupMealButtons();
 
@@ -776,3 +863,4 @@ initApp().catch(error => {
   console.error('Init failed:', error);
   applyTargets();
 });
+
