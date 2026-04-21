@@ -26,11 +26,14 @@ const DEFAULT_FOOD_DB = [
   { name: 'Ασπράδι αυγού ΒΛΑΧΑΚΗ', unit: 'ml', cal: 50, protein: 10, carbs: 1.1, fat: 0.5, image_path: 'assets/food_images/aspradi.jpg' },
   { name: 'Ψωμί τοστ', unit: 'τεμ', cal: 66.4, protein: 2.7, carbs: 10.8, fat: 1, image_path: 'assets/food_images/psomi.jpg' },
   { name: 'Cottage ADORO', unit: 'g', cal: 83, protein: 12.7, carbs: 3.1, fat: 2.2, image_path: 'assets/food_images/cottage.jpg' },
+  { name: 'Κατίκι Δομοκού ΗΠΕΙΡΟΣ', unit: 'g', cal: 169, protein: 10, carbs: 3, fat: 13, image_path: 'assets/food_images/katiki.jpg' },
   { name: 'Στήθος κοτόπουλο ψητό', unit: 'g', cal: 165, protein: 31, carbs: 0, fat: 3.6, image_path: 'assets/food_images/placeholder.svg' },
   { name: 'Ρύζι basmati βρασμένο', unit: 'g', cal: 351, protein: 7.5, carbs: 76, fat: 1.3, image_path: 'assets/food_images/basmati.jpg' },
   { name: 'Ελαιόλαδο', unit: 'g', cal: 884, protein: 0, carbs: 0, fat: 100, image_path: 'assets/food_images/placeholder.svg' },
   { name: 'Τρικαλινό ελαφρύ', unit: 'g', cal: 234, protein: 36, carbs: 0, fat: 10, image_path: 'assets/food_images/trikalino.jpg' },
   { name: 'ΝΙΚΑΣ Μπριζόλα σε φέτες', unit: 'g', cal: 111, protein: 18.2, carbs: 3.1, fat: 2.9, image_path: 'assets/food_images/mprizola.jpeg' },
+  { name: 'AGRINO Ρυζογκοφρέτες με ρίγανη', unit: 'τεμ', cal: 29, protein: 0.64, carbs: 5.3, fat: 0.5, image_path: 'assets/food_images/ruzogkofretes.jpg' },
+  { name: 'Μπισκότο πρωτεΐνης', unit: 'g', cal: 386, protein: 29.1, carbs: 34.6, fat: 18.1, image_path: 'assets/food_images/mpiskoto.jpg' },
   { name: 'Μακαρόνια βρασμένα', unit: 'g', cal: 360, protein: 12, carbs: 74, fat: 1.5, image_path: 'assets/food_images/makaronia.jpg' }
 ];
 

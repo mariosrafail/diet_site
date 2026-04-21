@@ -78,6 +78,7 @@ function getRowFactor(row, qty) {
 function getPieceGramsForFoodName(name) {
   const key = toFoodKey(name);
   if (key.includes(toFoodKey('Ψωμί τοστ'))) return 27;
+  if (key.includes(toFoodKey('ρυζογκοφρέτ')) || key.includes(toFoodKey('rice cake'))) return 7.5;
   if (key.includes('αυγ') || key.includes('marata')) return 55;
   return null;
 }
@@ -193,8 +194,12 @@ function updateUI() {
   refs.fatBar.style.width = `${Math.min(100, shares.fat)}%`;
   refs.carbsBar.style.width = `${Math.min(100, shares.carbs)}%`;
 
+  const proteinRemaining = round(targets.protein - totals.protein);
+
   refs.calorieStatus.textContent = `${calPct}%`;
-  refs.proteinStatus.textContent = `${proteinPct}%`;
+  if (proteinRemaining > 0) refs.proteinStatus.textContent = `${proteinPct}% · μένουν ${proteinRemaining} g`;
+  else if (proteinRemaining < 0) refs.proteinStatus.textContent = `${proteinPct}% · +${Math.abs(proteinRemaining)} g`;
+  else refs.proteinStatus.textContent = `${proteinPct}% · στόχος`;
   refs.fatStatus.textContent = `${shares.fat}%`;
   refs.carbsStatus.textContent = `${shares.carbs}%`;
 
