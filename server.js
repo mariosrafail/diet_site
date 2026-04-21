@@ -33,7 +33,8 @@ const DEFAULT_FOOD_DB = [
   { name: 'Τρικαλινό ελαφρύ', unit: 'g', cal: 234, protein: 36, carbs: 0, fat: 10, image_path: 'assets/food_images/trikalino.jpg' },
   { name: 'ΝΙΚΑΣ Μπριζόλα σε φέτες', unit: 'g', cal: 111, protein: 18.2, carbs: 3.1, fat: 2.9, image_path: 'assets/food_images/mprizola.jpeg' },
   { name: 'AGRINO Ρυζογκοφρέτες με ρίγανη', unit: 'τεμ', cal: 29, protein: 0.64, carbs: 5.3, fat: 0.5, image_path: 'assets/food_images/ruzogkofretes.jpg' },
-  { name: 'Μπισκότο πρωτεΐνης', unit: 'g', cal: 386, protein: 29.1, carbs: 34.6, fat: 18.1, image_path: 'assets/food_images/mpiskoto.jpg' },
+  { name: 'Μπισκότο πρωτεΐνης', unit: 'g', cal: 386, protein: 29.1, carbs: 34.6, fat: 18.1, image_path: 'assets/food_images/mpiskot.jpg' },
+  { name: 'Ξηροι καρποι', unit: 'g', cal: 567, protein: 21, carbs: 19, fat: 53, image_path: 'assets/food_images/kshroi.jpg' },
   { name: 'Μακαρόνια βρασμένα', unit: 'g', cal: 360, protein: 12, carbs: 74, fat: 1.5, image_path: 'assets/food_images/makaronia.jpg' }
 ];
 
