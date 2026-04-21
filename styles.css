@@ -483,11 +483,14 @@ select optgroup {
   border: 1px solid rgba(255,255,255,0.18);
 }
 .save-changes-btn {
-  position: fixed;
-  left: auto;
-  right: 12px;
-  transform: none;
-  bottom: 86px;
+  position: fixed !important;
+  left: auto !important;
+  top: auto !important;
+  right: max(10px, env(safe-area-inset-right)) !important;
+  bottom: max(10px, env(safe-area-inset-bottom)) !important;
+  transform: none !important;
+  width: auto !important;
+  margin: 0 !important;
   z-index: 70;
   padding: 10px 14px;
 }

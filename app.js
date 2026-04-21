@@ -672,21 +672,21 @@ function ensureAddMealButton() {
     head.appendChild(actions);
   }
 
-  if (!actions.querySelector('.save-changes-btn')) {
-    const saveChangesBtn = document.createElement('button');
-    saveChangesBtn.type = 'button';
-    saveChangesBtn.className = 'btn btn-secondary save-changes-btn';
-    saveChangesBtn.textContent = 'Save Changes';
-    saveChangesBtn.hidden = true;
-    actions.appendChild(saveChangesBtn);
-  }
-
   if (!actions.querySelector('.add-meal-btn')) {
     const addMealBtn = document.createElement('button');
     addMealBtn.type = 'button';
     addMealBtn.className = 'btn btn-secondary add-meal-btn';
     addMealBtn.textContent = '+ Νέο γεύμα';
     actions.appendChild(addMealBtn);
+  }
+
+  if (!document.querySelector('.save-changes-btn')) {
+    const saveChangesBtn = document.createElement('button');
+    saveChangesBtn.type = 'button';
+    saveChangesBtn.className = 'btn btn-secondary save-changes-btn';
+    saveChangesBtn.textContent = 'Save Changes';
+    saveChangesBtn.hidden = true;
+    document.body.appendChild(saveChangesBtn);
   }
 }
 
