@@ -303,6 +303,7 @@ select optgroup {
   text-overflow: ellipsis;
 }
 .alt-wrap-head { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 8px; }
+.food-alt-wrap { display: none !important; }
 .alt-toggle {
   display: inline-flex;
   align-items: center;
