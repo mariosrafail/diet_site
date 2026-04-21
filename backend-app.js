@@ -1,14 +1,10 @@
-﻿const fs = require('fs');
-const path = require('path');
-const express = require('express');
+﻿const express = require('express');
 const dotenv = require('dotenv');
 const { Pool } = require('pg');
 
 dotenv.config();
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const FOOD_IMAGES_DIR = path.join(__dirname, 'assets', 'food_images');
-
 if (!DATABASE_URL) {
   throw new Error('Missing DATABASE_URL in environment.');
 }
@@ -304,9 +300,10 @@ app.delete('/api/foods/:id', async (req, res) => {
 
 app.get('/api/food-images', (_req, res) => {
   try {
-    const entries = fs.readdirSync(FOOD_IMAGES_DIR, { withFileTypes: true });
-    const files = entries.filter(e => e.isFile()).map(e => `assets/food_images/${e.name}`).sort((a, b) => a.localeCompare(b));
-    res.json(files);
+    pool
+      .query('SELECT DISTINCT image_path FROM foods WHERE image_path IS NOT NULL AND image_path <> \'\' ORDER BY image_path ASC')
+      .then(result => res.json(result.rows.map(r => r.image_path)))
+      .catch(() => res.status(500).json({ error: 'images_read_failed' }));
   } catch {
     res.status(500).json({ error: 'images_read_failed' });
   }
@@ -459,3 +456,4 @@ module.exports = {
   app,
   ensureSchema
 };
+
