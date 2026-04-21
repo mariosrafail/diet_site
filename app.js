@@ -44,23 +44,10 @@ function setHasUnsavedChanges(value) {
   hasUnsavedChanges = Boolean(value);
   const saveBtn = document.querySelector('.save-changes-btn');
   if (saveBtn) saveBtn.hidden = !hasUnsavedChanges;
-  if (hasUnsavedChanges) positionSaveChangesButton();
 }
 
 function markUnsavedChanges() {
   setHasUnsavedChanges(true);
-}
-
-function positionSaveChangesButton() {
-  const saveBtn = document.querySelector('.save-changes-btn');
-  const dock = document.querySelector('.live-dock');
-  if (!saveBtn || !dock) return;
-
-  const gap = 8;
-  const viewportHeight = window.innerHeight;
-  const dockRect = dock.getBoundingClientRect();
-  const bottom = Math.max(12, (viewportHeight - dockRect.top) + gap);
-  saveBtn.style.bottom = `${Math.round(bottom)}px`;
 }
 
 function beginSaving() {
@@ -972,11 +959,7 @@ async function initApp() {
   updateFoodImages();
   applyTargets();
   setHasUnsavedChanges(false);
-  positionSaveChangesButton();
 }
-
-window.addEventListener('resize', positionSaveChangesButton);
-window.addEventListener('orientationchange', positionSaveChangesButton);
 
 initApp().catch(error => {
   console.error('Init failed:', error);

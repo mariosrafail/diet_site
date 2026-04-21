@@ -465,6 +465,10 @@ select optgroup {
   .food-row.row-locked { grid-template-columns: 1fr; }
   .food-row.row-locked .row-actions { justify-self: start; }
   .save-changes-btn {
+    right: 8px;
+    left: auto;
+    transform: none;
+    bottom: 132px;
     padding: 9px 12px;
   }
 }
@@ -480,9 +484,10 @@ select optgroup {
 }
 .save-changes-btn {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 120px;
+  left: auto;
+  right: 12px;
+  transform: none;
+  bottom: 86px;
   z-index: 70;
   padding: 10px 14px;
 }
