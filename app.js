@@ -37,6 +37,8 @@ let imageModal = null;
 let customMealCounter = 0;
 let altCounter = 0;
 let hasUnsavedChanges = false;
+let saveOverlay = null;
+let pendingSaveCount = 0;
 
 function setHasUnsavedChanges(value) {
   hasUnsavedChanges = Boolean(value);
@@ -46,6 +48,22 @@ function setHasUnsavedChanges(value) {
 
 function markUnsavedChanges() {
   setHasUnsavedChanges(true);
+}
+
+function beginSaving() {
+  pendingSaveCount += 1;
+  if (!saveOverlay) return;
+  saveOverlay.classList.add('open');
+  saveOverlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('saving');
+}
+
+function endSaving() {
+  pendingSaveCount = Math.max(0, pendingSaveCount - 1);
+  if (pendingSaveCount > 0 || !saveOverlay) return;
+  saveOverlay.classList.remove('open');
+  saveOverlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('saving');
 }
 
 function round(value) {
@@ -449,11 +467,16 @@ async function saveRowForUser(row, foodId) {
   const mealTitle = mealCard.querySelector('.meal-top h3')?.textContent?.trim() || mealKey;
   const qty = Number(row.querySelector('.qty-box input')?.value || 0);
 
-  await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/meal-items`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mealKey, rowKey: row.dataset.rowKey, foodId, qty, mealTitle })
-  });
+  beginSaving();
+  try {
+    await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/meal-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mealKey, rowKey: row.dataset.rowKey, foodId, qty, mealTitle })
+    });
+  } finally {
+    endSaving();
+  }
 }
 
 function parseQtyAndUnit(text) {
@@ -770,6 +793,8 @@ function collectDashboardPayload() {
 }
 
 async function saveDashboardChanges(silent = false) {
+  beginSaving();
+  try {
   const payload = collectDashboardPayload();
   const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`, {
     method: 'PUT',
@@ -787,6 +812,9 @@ async function saveDashboardChanges(silent = false) {
         saveBtn.textContent = original;
       }, 900);
     }
+  }
+  } finally {
+    endSaving();
   }
 }
 
@@ -916,6 +944,7 @@ document.addEventListener('click', e => {
 });
 
 async function initApp() {
+  saveOverlay = document.getElementById('savingOverlay');
   setupImageModal();
   loadTargetsLocal();
   setupAlternativeDropdowns();
