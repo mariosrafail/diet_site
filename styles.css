@@ -123,13 +123,14 @@ input, select {
   border-radius: 16px;
   outline: none;
 }
+select option,
+select optgroup {
+  color: #0f172a;
+  background: #ffffff;
+}
 #proteinMultiplier {
   background-color: rgba(19, 26, 47, 0.9);
   color: var(--text);
-}
-#proteinMultiplier option {
-  background-color: #101a31;
-  color: #eef4ff;
 }
 .btn {
   margin-top: 16px;
