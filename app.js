@@ -38,6 +38,7 @@ const dockRefs = {
 
 const FOODS_API_ENDPOINT = '/api/foods';
 const USER_SLUG_STORAGE_KEY = 'diet_user_slug';
+const MEAL_SELECTIONS_STORAGE_KEY = 'diet_meal_group_selection_v1';
 const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
 const FOOD_CATEGORY_LABELS = {
   vegetables: 'Λαχανικά',
@@ -59,6 +60,53 @@ let pendingSaveCount = 0;
 const mealGroupSelection = new Map();
 let currentUserSlug = '';
 let currentUserFullName = '';
+
+function readStoredMealSelections() {
+  try {
+    const raw = localStorage.getItem(MEAL_SELECTIONS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredMealSelections(payload) {
+  try {
+    localStorage.setItem(MEAL_SELECTIONS_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore storage errors (quota/private mode/etc).
+  }
+}
+
+function loadMealSelectionForActiveUser() {
+  const slug = getActiveUserSlug();
+  const all = readStoredMealSelections();
+  const userSelection = all[slug];
+  mealGroupSelection.clear();
+  if (!userSelection || typeof userSelection !== 'object') return;
+
+  Object.entries(userSelection).forEach(([groupKey, mealKey]) => {
+    if (!groupKey || !mealKey) return;
+    mealGroupSelection.set(String(groupKey), String(mealKey));
+  });
+}
+
+function persistMealSelectionForActiveUser() {
+  const slug = currentUserSlug;
+  if (!slug) return;
+
+  const all = readStoredMealSelections();
+  const userSelection = {};
+  mealGroupSelection.forEach((mealKey, groupKey) => {
+    if (!groupKey || !mealKey) return;
+    userSelection[groupKey] = mealKey;
+  });
+  all[slug] = userSelection;
+  writeStoredMealSelections(all);
+}
 
 function normalizeUserSlug(rawSlug) {
   return String(rawSlug || '').trim().toLowerCase();
@@ -289,6 +337,8 @@ function syncMealSelectionControls() {
       chooseBtn.textContent = isSelected ? 'Υπολογίζεται αυτό' : 'Υπολόγισε σύμφωνα με αυτό';
     });
   });
+
+  persistMealSelectionForActiveUser();
 }
 
 function getActiveMealCardsForTotals() {
@@ -1247,6 +1297,7 @@ async function loadDashboard() {
     else mealsPanel?.appendChild(card);
   });
 
+  loadMealSelectionForActiveUser();
   setupMealButtons();
   return data;
 }
@@ -1399,6 +1450,7 @@ document.addEventListener('click', e => {
     if (!mealCard || !groupKey || !mealKey) return;
     mealGroupSelection.set(groupKey, mealKey);
     syncMealSelectionControls();
+    persistMealSelectionForActiveUser();
     updateUI();
     return;
   }
