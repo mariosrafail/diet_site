@@ -277,13 +277,18 @@ function getCookedWeightProfile(labelText) {
     return { rawPerCooked: 0.37, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
   }
   if (key.includes(toFoodKey('μακαρ')) || key.includes(toFoodKey('σπαγγ')) || key.includes('pasta')) {
-    return { rawPerCooked: 0.45, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
+    return { rawPerCooked: 0.5, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
   }
   if (key.includes(toFoodKey('κοτοπουλ'))) {
     return { rawPerCooked: 1.33, cookedLabel: 'ψημένο', rawLabel: 'ωμό' };
   }
   if (key.includes(toFoodKey('κιμα'))) {
-    return { rawPerCooked: 1.3, cookedLabel: 'μαγειρεμένο', rawLabel: 'ωμό' };
+    if (key.includes(toFoodKey('βρασ'))) {
+      // For boiled mince we assume the cooked weight can be slightly higher
+      // due to water retention.
+      return { rawPerCooked: 0.9, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
+    }
+    return { rawPerCooked: 1.25, cookedLabel: 'μαγειρεμένο', rawLabel: 'ωμό' };
   }
   if (key.includes(toFoodKey('πατατ'))) {
     return { rawPerCooked: 1.2, cookedLabel: 'μαγειρεμένη', rawLabel: 'ωμή' };
