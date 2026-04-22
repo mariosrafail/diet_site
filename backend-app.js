@@ -1,6 +1,8 @@
-﻿const express = require('express');
+const express = require('express');
 const dotenv = require('dotenv');
 const { Pool } = require('pg');
+const fs = require('fs/promises');
+const path = require('path');
 
 dotenv.config();
 
@@ -89,6 +91,30 @@ function normalizeFood(input) {
     fat: Number(input.fat || 0),
     image_path: normalizeImagePath(input.image_path)
   };
+}
+
+
+async function listFoodImageFiles() {
+  const allowedExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif', '.gif']);
+  const candidates = [
+    path.join(process.cwd(), 'assets', 'food_images'),
+    path.join(__dirname, 'assets', 'food_images')
+  ];
+
+  for (const dirPath of candidates) {
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      return entries
+        .filter(entry => entry.isFile())
+        .map(entry => entry.name)
+        .filter(name => allowedExt.has(path.extname(name).toLowerCase()))
+        .map(name => `assets/food_images/${name}`);
+    } catch {
+      // Try next candidate path.
+    }
+  }
+
+  return [];
 }
 
 let schemaReadyPromise = null;
@@ -294,12 +320,19 @@ app.delete('/api/foods/:id', async (req, res) => {
   }
 });
 
-app.get('/api/food-images', (_req, res) => {
+app.get('/api/food-images', async (_req, res) => {
   try {
-    pool
-      .query('SELECT DISTINCT image_path FROM foods WHERE image_path IS NOT NULL AND image_path <> \'\' ORDER BY image_path ASC')
-      .then(result => res.json(result.rows.map(r => r.image_path)))
-      .catch(() => res.status(500).json({ error: 'images_read_failed' }));
+    const [dbResult, localFiles] = await Promise.all([
+      pool.query('SELECT DISTINCT image_path FROM foods WHERE image_path IS NOT NULL AND image_path <> \'\' ORDER BY image_path ASC'),
+      listFoodImageFiles()
+    ]);
+
+    const merged = new Set([
+      ...dbResult.rows.map(row => String(row.image_path || '').trim()).filter(Boolean),
+      ...localFiles
+    ]);
+
+    res.json(Array.from(merged).sort((a, b) => a.localeCompare(b, 'el')));
   } catch {
     res.status(500).json({ error: 'images_read_failed' });
   }
