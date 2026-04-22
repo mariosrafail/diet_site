@@ -1015,7 +1015,6 @@ select optgroup {
 }
 
 body.viewer-mode .section-actions,
-body.viewer-mode .save-changes-btn,
 body.viewer-mode .meal-actions > .add-food-btn,
 body.viewer-mode .meal-actions > .add-alt-meal-btn,
 body.viewer-mode .meal-actions > .remove-meal-btn,

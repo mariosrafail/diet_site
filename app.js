@@ -354,6 +354,22 @@ function organizeMealGroupsInDom() {
     head.className = 'meal-group-head';
     const titleEl = document.createElement('h4');
     titleEl.textContent = resolveMealGroupTitle(cards, groupKey);
+    if (canEditPlan()) {
+      titleEl.classList.add('editable-text');
+      titleEl.setAttribute('contenteditable', 'true');
+      titleEl.addEventListener('input', () => {
+        const nextTitle = String(titleEl.textContent || '').trim();
+        const primaryCard = cards.find(card => {
+          const rawTitle = card.querySelector('.meal-top h3')?.textContent || '';
+          return !String(rawTitle).includes('Εναλλακτική');
+        }) || cards[0];
+        const primaryTitleEl = primaryCard?.querySelector('.meal-top h3');
+        if (primaryTitleEl && nextTitle) primaryTitleEl.textContent = nextTitle;
+        markUnsavedChanges();
+      });
+    } else {
+      titleEl.setAttribute('contenteditable', 'false');
+    }
     const countEl = document.createElement('small');
     countEl.textContent = cards.length > 1 ? `${cards.length} επιλογές` : '1 επιλογή';
     head.appendChild(titleEl);
@@ -882,8 +898,7 @@ function applyAlternativeFoodSelection(row) {
   if (dbSelect) dbSelect.value = alternativeFood.id;
 
   saveRowForUser(row, alternativeFood.id).catch(error => console.error('Failed to save alternative row:', error));
-  if (canEditPlan()) markUnsavedChanges();
-  else setHasUnsavedChanges(false);
+  markUnsavedChanges();
   renderAlternativeMenuForRow(row);
   closeAlternativeMenus();
   updateUI();
@@ -1478,7 +1493,6 @@ document.addEventListener('click', e => {
 
   const saveChangesBtn = e.target.closest('.save-changes-btn');
   if (saveChangesBtn) {
-    if (!canEditPlan()) return;
     saveDashboardChanges().catch(error => console.error('Failed to save dashboard:', error));
     return;
   }
