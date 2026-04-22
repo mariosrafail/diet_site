@@ -142,6 +142,65 @@ function getMealCardsGroupedByKey() {
   return groups;
 }
 
+function normalizeMealGroupTitle(rawTitle) {
+  return String(rawTitle || '')
+    .replace(/\s*\(Εναλλακτική\)\s*$/i, '')
+    .trim();
+}
+
+function resolveMealGroupTitle(cards, fallbackKey) {
+  const preferred = cards.find(card => {
+    const title = card.querySelector('.meal-top h3')?.textContent || '';
+    return !String(title).includes('Εναλλακτική');
+  }) || cards[0];
+  const title = normalizeMealGroupTitle(preferred?.querySelector('.meal-top h3')?.textContent || '');
+  return title || fallbackKey || 'Γεύμα';
+}
+
+function organizeMealGroupsInDom() {
+  const mealsPanel = document.querySelector('.panel.glass.meals');
+  if (!mealsPanel) return;
+
+  const sweetCard = mealsPanel.querySelector('.meal-card.sweet-card');
+  const cardsInOrder = Array.from(mealsPanel.querySelectorAll('.meal-card:not(.sweet-card)'));
+  if (!cardsInOrder.length) {
+    mealsPanel.querySelectorAll('.meal-group-box').forEach(box => box.remove());
+    return;
+  }
+
+  const groups = new Map();
+  cardsInOrder.forEach(card => {
+    const groupKey = card.dataset.mealGroup || getMealGroupKey(card.dataset.meal || '');
+    if (!groupKey) return;
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey).push(card);
+  });
+
+  const fragment = document.createDocumentFragment();
+  groups.forEach((cards, groupKey) => {
+    const box = document.createElement('div');
+    box.className = 'meal-group-box';
+    box.dataset.mealGroup = groupKey;
+
+    const head = document.createElement('div');
+    head.className = 'meal-group-head';
+    const titleEl = document.createElement('h4');
+    titleEl.textContent = resolveMealGroupTitle(cards, groupKey);
+    const countEl = document.createElement('small');
+    countEl.textContent = cards.length > 1 ? `${cards.length} επιλογές` : '1 επιλογή';
+    head.appendChild(titleEl);
+    head.appendChild(countEl);
+    box.appendChild(head);
+
+    cards.forEach(card => box.appendChild(card));
+    fragment.appendChild(box);
+  });
+
+  mealsPanel.querySelectorAll('.meal-group-box').forEach(box => box.remove());
+  if (sweetCard) mealsPanel.insertBefore(fragment, sweetCard);
+  else mealsPanel.appendChild(fragment);
+}
+
 function syncMealSelectionControls() {
   const groups = getMealCardsGroupedByKey();
 
@@ -240,13 +299,23 @@ function calculateMacroShares(totals) {
 
 function updateMealCalories() {
   document.querySelectorAll('.meal-card:not(.sweet-card)').forEach(card => {
-    const kcal = round(Array.from(card.querySelectorAll('.food-row.editable')).reduce((sum, row) => {
+    const mealTotals = Array.from(card.querySelectorAll('.food-row.editable')).reduce((acc, row) => {
       const qty = Number(row.querySelector('.qty-box input')?.value || 0);
-      return sum + (Number(row.dataset.cal || 0) * getRowFactor(row, qty));
-    }, 0));
+      const factor = getRowFactor(row, qty);
+      acc.kcal += Number(row.dataset.cal || 0) * factor;
+      acc.protein += Number(row.dataset.protein || 0) * factor;
+      acc.fat += Number(row.dataset.fat || 0) * factor;
+      acc.carbs += Number(row.dataset.carbs || 0) * factor;
+      return acc;
+    }, { kcal: 0, protein: 0, fat: 0, carbs: 0 });
+
+    const kcal = round(mealTotals.kcal);
+    const protein = round(mealTotals.protein);
+    const fat = round(mealTotals.fat);
+    const carbs = round(mealTotals.carbs);
 
     const badge = card.querySelector('.meal-kcal');
-    if (badge) badge.textContent = `~${kcal} kcal`;
+    if (badge) badge.textContent = `~${kcal} kcal · ${protein}P, ${fat}F, ${carbs}C`;
   });
 }
 
@@ -913,6 +982,7 @@ function ensureAddMealButton() {
 function setupMealButtons() {
   document.querySelectorAll('.meal-card').forEach(ensureMealControlButtons);
   ensureAddMealButton();
+  organizeMealGroupsInDom();
   syncMealSelectionControls();
 }
 
@@ -969,6 +1039,7 @@ function applyDashboardTargets(targetsData) {
 
 function clearDashboardMealCards() {
   document.querySelectorAll('.meal-card:not(.sweet-card)').forEach(card => card.remove());
+  document.querySelectorAll('.meal-group-box').forEach(box => box.remove());
 }
 
 function collectDashboardPayload() {
@@ -1164,6 +1235,7 @@ document.addEventListener('click', e => {
     const sweetCard = document.querySelector('.meal-card.sweet-card');
     if (sweetCard?.parentElement) sweetCard.parentElement.insertBefore(newMeal, sweetCard);
     else document.querySelector('.panel.glass.meals')?.appendChild(newMeal);
+    organizeMealGroupsInDom();
     refreshDbSelectOptions();
     markUnsavedChanges();
     updateUI();
@@ -1177,6 +1249,7 @@ document.addEventListener('click', e => {
     if (!altMealCard || !sourceMealCard?.parentElement) return;
 
     sourceMealCard.parentElement.insertBefore(altMealCard, sourceMealCard.nextSibling);
+    organizeMealGroupsInDom();
     refreshDbSelectOptions();
     syncMealSelectionControls();
     markUnsavedChanges();
@@ -1207,6 +1280,7 @@ document.addEventListener('click', e => {
   const removeMealBtn = e.target.closest('.remove-meal-btn');
   if (removeMealBtn) {
     removeMealBtn.closest('.meal-card')?.remove();
+    organizeMealGroupsInDom();
     syncMealSelectionControls();
     saveDashboardChanges(true).catch(error => {
       console.error('Failed to auto-save after meal removal:', error);
