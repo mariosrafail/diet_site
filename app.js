@@ -39,6 +39,8 @@ const dockRefs = {
 const FOODS_API_ENDPOINT = '/api/foods';
 const USER_SLUG_STORAGE_KEY = 'diet_user_slug';
 const MEAL_SELECTIONS_STORAGE_KEY = 'diet_meal_group_selection_v1';
+const ADMIN_SLUG = 'admin123123';
+const ADMIN_SESSION_STORAGE_KEY = 'diet_admin_session';
 const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
 const FOOD_CATEGORY_LABELS = {
   vegetables: 'Λαχανικά',
@@ -60,6 +62,61 @@ let pendingSaveCount = 0;
 const mealGroupSelection = new Map();
 let currentUserSlug = '';
 let currentUserFullName = '';
+let isAdminMode = false;
+
+function isAdminUserSlug(slug) {
+  return normalizeUserSlug(slug) === ADMIN_SLUG;
+}
+
+function canEditPlan() {
+  return isAdminMode;
+}
+
+function setAdminSessionActive(active) {
+  if (active) localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, ADMIN_SLUG);
+  else localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+}
+
+function hasAdminSession() {
+  return normalizeUserSlug(localStorage.getItem(ADMIN_SESSION_STORAGE_KEY)) === ADMIN_SLUG;
+}
+
+function getManagedUserFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeUserSlug(params.get('managed_user') || params.get('user') || '');
+}
+
+function isManagedAdminView() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('admin') === '1';
+}
+
+function applyRoleUiState() {
+  const viewerMode = !canEditPlan();
+  document.body.classList.toggle('viewer-mode', viewerMode);
+  document.body.classList.toggle('admin-mode', !viewerMode);
+
+  const controlsPanel = document.querySelector('.panel.glass.controls');
+  if (controlsPanel) controlsPanel.hidden = viewerMode;
+
+  if (refs.calorieTargetInput) refs.calorieTargetInput.disabled = viewerMode;
+  if (refs.proteinMultiplier) refs.proteinMultiplier.disabled = viewerMode;
+  if (refs.weightInput) refs.weightInput.disabled = viewerMode;
+  if (refs.applyTargets) refs.applyTargets.hidden = viewerMode;
+
+  getEditableRows().forEach(row => {
+    setRowLocked(row, true);
+    const qtyInput = row.querySelector('.qty-box input');
+    if (qtyInput) qtyInput.disabled = viewerMode;
+  });
+
+  getAllTrackableMealCards().forEach(card => {
+    const titleEl = card.querySelector('.meal-top h3');
+    const descEl = card.querySelector('.meal-top p');
+    if (titleEl) titleEl.setAttribute('contenteditable', viewerMode ? 'false' : 'true');
+    if (descEl) descEl.setAttribute('contenteditable', viewerMode ? 'false' : 'true');
+  });
+}
 
 function readStoredMealSelections() {
   try {
@@ -226,14 +283,15 @@ function ensureMealTitleEditing() {
   getAllTrackableMealCards().forEach(card => {
     const titleEl = card.querySelector('.meal-top h3');
     const descEl = card.querySelector('.meal-top p');
+    const editable = canEditPlan();
 
     if (titleEl) {
       titleEl.classList.add('editable-text');
-      titleEl.setAttribute('contenteditable', 'true');
+      titleEl.setAttribute('contenteditable', editable ? 'true' : 'false');
     }
     if (descEl) {
       descEl.classList.add('editable-text');
-      descEl.setAttribute('contenteditable', 'true');
+      descEl.setAttribute('contenteditable', editable ? 'true' : 'false');
     }
   });
 }
@@ -332,7 +390,7 @@ function syncMealSelectionControls() {
 
       const chooseBtn = card.querySelector('.calculate-with-this-btn');
       if (!chooseBtn) return;
-      chooseBtn.hidden = !hasMultiple;
+      chooseBtn.hidden = !hasMultiple || !canEditPlan();
       chooseBtn.classList.toggle('active', isSelected);
       chooseBtn.textContent = isSelected ? 'Υπολογίζεται αυτό' : 'Υπολόγισε σύμφωνα με αυτό';
     });
@@ -817,7 +875,8 @@ function applyAlternativeFoodSelection(row) {
   if (dbSelect) dbSelect.value = alternativeFood.id;
 
   saveRowForUser(row, alternativeFood.id).catch(error => console.error('Failed to save alternative row:', error));
-  markUnsavedChanges();
+  if (canEditPlan()) markUnsavedChanges();
+  else setHasUnsavedChanges(false);
   renderAlternativeMenuForRow(row);
   closeAlternativeMenus();
   updateUI();
@@ -1080,8 +1139,8 @@ function createMealCard(mealKey = null, title = null, description = null, includ
   card.innerHTML = `
     <div class="meal-top">
       <div>
-        <h3 class="editable-text" contenteditable="true">${title || `Νέο γεύμα ${customMealCounter}`}</h3>
-        <p class="editable-text" contenteditable="true">${description || 'Γράψε περιγραφή γεύματος'}</p>
+        <h3 class="editable-text" contenteditable="${canEditPlan() ? 'true' : 'false'}">${title || `Νέο γεύμα ${customMealCounter}`}</h3>
+        <p class="editable-text" contenteditable="${canEditPlan() ? 'true' : 'false'}">${description || 'Γράψε περιγραφή γεύματος'}</p>
       </div>
       <span class="meal-kcal">~0 kcal</span>
       <div class="meal-actions">
@@ -1133,6 +1192,7 @@ function setupMealButtons() {
   ensureAddMealButton();
   organizeMealGroupsInDom();
   syncMealSelectionControls();
+  applyRoleUiState();
 }
 
 function openImageModal(src, alt = 'Εικόνα τροφίμου') {
@@ -1302,7 +1362,10 @@ async function loadDashboard() {
   return data;
 }
 
-refs.applyTargets?.addEventListener('click', applyTargets);
+refs.applyTargets?.addEventListener('click', () => {
+  if (!canEditPlan()) return;
+  applyTargets();
+});
 
 document.addEventListener('input', e => {
   const qtyInput = e.target.closest('.food-row.editable .qty-box input');
@@ -1313,6 +1376,7 @@ document.addEventListener('input', e => {
   }
 
   if (e.target.closest('.meal-top .editable-text')) {
+    if (!canEditPlan()) return;
     markUnsavedChanges();
     return;
   }
@@ -1332,6 +1396,7 @@ document.addEventListener('click', e => {
 
   const rowUpBtn = e.target.closest('.row-up-btn');
   if (rowUpBtn) {
+    if (!canEditPlan()) return;
     const row = rowUpBtn.closest('.food-row');
     if (!row) return;
     if (!moveFoodRow(row, 'up')) return;
@@ -1343,6 +1408,7 @@ document.addEventListener('click', e => {
 
   const rowDownBtn = e.target.closest('.row-down-btn');
   if (rowDownBtn) {
+    if (!canEditPlan()) return;
     const row = rowDownBtn.closest('.food-row');
     if (!row) return;
     if (!moveFoodRow(row, 'down')) return;
@@ -1354,6 +1420,7 @@ document.addEventListener('click', e => {
 
   const editBtn = e.target.closest('.row-edit-btn');
   if (editBtn) {
+    if (!canEditPlan()) return;
     const row = editBtn.closest('.food-row');
     if (row) setRowLocked(row, false);
     return;
@@ -1361,6 +1428,7 @@ document.addEventListener('click', e => {
 
   const saveBtn = e.target.closest('.row-save-btn');
   if (saveBtn) {
+    if (!canEditPlan()) return;
     const row = saveBtn.closest('.food-row');
     if (!row) return;
 
@@ -1403,12 +1471,14 @@ document.addEventListener('click', e => {
 
   const saveChangesBtn = e.target.closest('.save-changes-btn');
   if (saveChangesBtn) {
+    if (!canEditPlan()) return;
     saveDashboardChanges().catch(error => console.error('Failed to save dashboard:', error));
     return;
   }
 
   const addFoodBtn = e.target.closest('.add-food-btn');
   if (addFoodBtn) {
+    if (!canEditPlan()) return;
     addFoodToMeal(addFoodBtn.closest('.meal-card'));
     markUnsavedChanges();
     return;
@@ -1416,6 +1486,7 @@ document.addEventListener('click', e => {
 
   const addMealBtn = e.target.closest('.add-meal-btn');
   if (addMealBtn) {
+    if (!canEditPlan()) return;
     const newMeal = createMealCard();
     const sweetCard = document.querySelector('.meal-card.sweet-card');
     if (sweetCard?.parentElement) sweetCard.parentElement.insertBefore(newMeal, sweetCard);
@@ -1429,6 +1500,7 @@ document.addEventListener('click', e => {
 
   const addAltMealBtn = e.target.closest('.add-alt-meal-btn');
   if (addAltMealBtn) {
+    if (!canEditPlan()) return;
     const sourceMealCard = addAltMealBtn.closest('.meal-card');
     const altMealCard = createAlternativeMealFromCard(sourceMealCard);
     if (!altMealCard || !sourceMealCard?.parentElement) return;
@@ -1444,6 +1516,7 @@ document.addEventListener('click', e => {
 
   const calculateWithThisBtn = e.target.closest('.calculate-with-this-btn');
   if (calculateWithThisBtn) {
+    if (!canEditPlan()) return;
     const mealCard = calculateWithThisBtn.closest('.meal-card');
     const groupKey = mealCard?.dataset.mealGroup;
     const mealKey = mealCard?.dataset.meal;
@@ -1457,6 +1530,7 @@ document.addEventListener('click', e => {
 
   const removeRowBtn = e.target.closest('.row-remove-btn, .remove-row-btn');
   if (removeRowBtn) {
+    if (!canEditPlan()) return;
     removeRowBtn.closest('.food-row')?.remove();
     markUnsavedChanges();
     updateUI();
@@ -1465,6 +1539,7 @@ document.addEventListener('click', e => {
 
   const removeMealBtn = e.target.closest('.remove-meal-btn');
   if (removeMealBtn) {
+    if (!canEditPlan()) return;
     removeMealBtn.closest('.meal-card')?.remove();
     organizeMealGroupsInDom();
     syncMealSelectionControls();
@@ -1496,9 +1571,19 @@ async function initApp() {
 }
 
 async function startUserSession(slug, options = {}) {
-  const { showError = true } = options;
+  const {
+    showError = true,
+    persistUserSlug = true,
+    closeGateOnSuccess = true
+  } = options;
   const normalizedSlug = normalizeUserSlug(slug);
   if (!normalizedSlug) return false;
+
+  if (isAdminUserSlug(normalizedSlug) && !isManagedAdminView()) {
+    setAdminSessionActive(true);
+    window.location.href = 'admin.html';
+    return true;
+  }
 
   if (refs.userGateError) refs.userGateError.hidden = true;
   if (refs.userSlugSubmit) refs.userSlugSubmit.disabled = true;
@@ -1523,8 +1608,8 @@ async function startUserSession(slug, options = {}) {
     renderAlternativeMenus();
     await applyTargets({ persistRemote: false });
     setHasUnsavedChanges(false);
-    localStorage.setItem(USER_SLUG_STORAGE_KEY, normalizedSlug);
-    setUserGateOpen(false);
+    if (persistUserSlug) localStorage.setItem(USER_SLUG_STORAGE_KEY, normalizedSlug);
+    if (closeGateOnSuccess) setUserGateOpen(false);
     return true;
   } catch (error) {
     clearUserSession();
@@ -1553,6 +1638,10 @@ function setupAuthHandlers() {
   });
 
   refs.logoutBtn?.addEventListener('click', () => {
+    if (isAdminMode) {
+      window.location.href = 'admin.html';
+      return;
+    }
     clearUserSession();
     clearDashboardMealCards();
     setHasUnsavedChanges(false);
@@ -1567,6 +1656,24 @@ function setupAuthHandlers() {
 
 initApp().then(async () => {
   setupAuthHandlers();
+  const managedUserSlug = getManagedUserFromQuery();
+  if (managedUserSlug) {
+    if (!isManagedAdminView() || !hasAdminSession()) {
+      window.location.href = 'admin.html';
+      return;
+    }
+    isAdminMode = true;
+    setUserGateOpen(false);
+    await startUserSession(managedUserSlug, {
+      showError: true,
+      persistUserSlug: false,
+      closeGateOnSuccess: false
+    });
+    applyRoleUiState();
+    return;
+  }
+
+  isAdminMode = false;
   const cachedSlug = normalizeUserSlug(localStorage.getItem(USER_SLUG_STORAGE_KEY));
   if (cachedSlug) {
     await startUserSession(cachedSlug, { showError: false });

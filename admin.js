@@ -1,5 +1,8 @@
 const FOODS_API_ENDPOINT = '/api/foods';
+const USERS_API_ENDPOINT = '/api/users';
 const FOOD_IMAGE_UPLOAD_API_ENDPOINT = '/api/food-images/upload';
+const ADMIN_SLUG = 'admin123123';
+const ADMIN_SESSION_STORAGE_KEY = 'diet_admin_session';
 const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
 const FOOD_CATEGORY_LABELS = {
   vegetables: 'Λαχανικά',
@@ -29,12 +32,28 @@ const refs = {
   adminLoadingOverlayLabel: document.getElementById('adminLoadingOverlayLabel'),
   imagePreview: document.getElementById('imagePreview'),
   imagePreviewText: document.getElementById('imagePreviewText'),
-  saveFoodDbBtn: document.getElementById('saveFoodDbBtn')
+  saveFoodDbBtn: document.getElementById('saveFoodDbBtn'),
+  adminUsersList: document.getElementById('adminUsersList')
 };
 
 let foods = [];
+let users = [];
 let activeCategoryFilter = 'all';
 let pendingLoadingCount = 0;
+
+function normalizeUserSlug(raw) {
+  return String(raw || '').trim().toLowerCase();
+}
+
+function hasAdminSession() {
+  return normalizeUserSlug(localStorage.getItem(ADMIN_SESSION_STORAGE_KEY)) === ADMIN_SLUG;
+}
+
+function ensureAdminAccess() {
+  if (hasAdminSession()) return true;
+  window.location.href = 'index.html';
+  return false;
+}
 
 function beginLoading(label = 'Φόρτωση...') {
   pendingLoadingCount += 1;
@@ -79,6 +98,13 @@ async function fetchFoods() {
   if (!res.ok) throw new Error('foods_fetch_failed');
   const data = await res.json();
   foods = Array.isArray(data) ? data.map(normalizeFoodEntry) : [];
+}
+
+async function fetchUsers() {
+  const res = await fetch(USERS_API_ENDPOINT, { cache: 'no-store' });
+  if (!res.ok) throw new Error('users_fetch_failed');
+  const data = await res.json();
+  users = Array.isArray(data) ? data : [];
 }
 
 function updateImagePreview() {
@@ -214,6 +240,48 @@ function renderFoodsTable() {
     });
 }
 
+function renderUsersList() {
+  if (!refs.adminUsersList) return;
+  refs.adminUsersList.innerHTML = '';
+
+  const visibleUsers = users
+    .filter(user => normalizeUserSlug(user.slug) !== ADMIN_SLUG)
+    .sort((a, b) => String(a.slug || '').localeCompare(String(b.slug || ''), 'el'));
+
+  if (!visibleUsers.length) {
+    refs.adminUsersList.textContent = 'Δεν υπάρχουν χρήστες.';
+    return;
+  }
+
+  visibleUsers.forEach(user => {
+    const item = document.createElement('div');
+    item.className = 'admin-user-item';
+
+    const meta = document.createElement('div');
+    meta.className = 'admin-user-meta';
+    const fullName = String(user.full_name || '').trim();
+    const strong = document.createElement('strong');
+    strong.textContent = fullName || user.slug;
+    const small = document.createElement('small');
+    small.textContent = `slug: ${user.slug}`;
+    meta.appendChild(strong);
+    meta.appendChild(small);
+
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'mini-btn';
+    openBtn.textContent = 'Άνοιγμα διατροφής';
+    openBtn.addEventListener('click', () => {
+      const slug = encodeURIComponent(String(user.slug || '').trim());
+      window.location.href = `index.html?managed_user=${slug}&admin=1`;
+    });
+
+    item.appendChild(meta);
+    item.appendChild(openBtn);
+    refs.adminUsersList.appendChild(item);
+  });
+}
+
 async function saveFood() {
   const payload = {
     name: refs.dbNameInput.value.trim(),
@@ -239,8 +307,9 @@ async function saveFood() {
 async function reloadData() {
   beginLoading('Φόρτωση δεδομένων...');
   try {
-    await fetchFoods();
+    await Promise.all([fetchFoods(), fetchUsers()]);
     renderFoodsTable();
+    renderUsersList();
   } finally {
     endLoading();
   }
@@ -265,5 +334,7 @@ refs.saveFoodDbBtn.addEventListener('click', async () => {
   }
 });
 
-updateImagePreview();
-reloadData().catch(error => console.error(error));
+if (ensureAdminAccess()) {
+  updateImagePreview();
+  reloadData().catch(error => console.error(error));
+}

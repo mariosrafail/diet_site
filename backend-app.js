@@ -126,6 +126,17 @@ const DEFAULT_USER_PROFILES = [
       { meal_key: 'dinner', row_key: 'dinner-mince', food_name: 'ΝΙΚΑΣ Μπριζόλα σε φέτες', qty: 220 },
       { meal_key: 'dinner', row_key: 'dinner-pasta', food_name: 'Μακαρόνια βρασμένα', qty: 180 }
     ]
+  },
+  {
+    user: {
+      slug: 'admin123123',
+      full_name: 'Admin',
+      weight: 80,
+      proteinMultiplier: 1.7,
+      calorieTarget: 2200
+    },
+    meals: [],
+    items: []
   }
 ];
 
@@ -507,6 +518,19 @@ app.get('/api/foods', async (_req, res) => {
     res.json(result.rows);
   } catch {
     res.status(500).json({ error: 'read_failed' });
+  }
+});
+
+app.get('/api/users', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, slug, full_name
+       FROM users
+       ORDER BY slug ASC`
+    );
+    res.json(result.rows);
+  } catch {
+    res.status(500).json({ error: 'users_read_failed' });
   }
 });
 

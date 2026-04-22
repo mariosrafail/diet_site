@@ -985,6 +985,63 @@ select optgroup {
   border-radius: 10px;
 }
 
+.admin-users-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+}
+
+.admin-user-meta {
+  min-width: 0;
+}
+
+.admin-user-meta strong,
+.admin-user-meta small {
+  display: block;
+}
+
+.admin-user-meta small {
+  color: var(--muted);
+}
+
+body.viewer-mode .section-actions,
+body.viewer-mode .save-changes-btn,
+body.viewer-mode .meal-actions > .add-food-btn,
+body.viewer-mode .meal-actions > .add-alt-meal-btn,
+body.viewer-mode .meal-actions > .remove-meal-btn,
+body.viewer-mode .meal-actions > .calculate-with-this-btn,
+body.viewer-mode .food-row .row-actions,
+body.viewer-mode .food-row .db-picker {
+  display: none !important;
+}
+
+body.viewer-mode .panel.glass.controls {
+  display: none;
+}
+
+body.viewer-mode .meal-top .editable-text[contenteditable="false"] {
+  cursor: default;
+  background: transparent;
+}
+
+body.viewer-mode .food-row.row-locked .food-alt-wrap {
+  justify-self: end;
+}
+
+body.viewer-mode .food-row.row-locked .qty-box input {
+  opacity: 0.85;
+}
+
 @media (max-width: 980px) {
   .meal-actions {
     justify-content: flex-start;
