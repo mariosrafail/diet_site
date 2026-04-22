@@ -173,6 +173,16 @@ function getImageMimeType(ext) {
   return IMAGE_MIME_BY_EXT[String(ext || '').toLowerCase()] || 'application/octet-stream';
 }
 
+function toBinaryBuffer(raw) {
+  if (Buffer.isBuffer(raw)) return raw;
+  if (typeof raw === 'string') {
+    if (raw.startsWith('\\x')) return Buffer.from(raw.slice(2), 'hex');
+    return Buffer.from(raw, 'binary');
+  }
+  if (raw == null) return Buffer.alloc(0);
+  return Buffer.from(raw);
+}
+
 function getUploadTargetDirCandidates() {
   return [
     path.join(process.cwd(), 'assets', 'food_images'),
@@ -541,9 +551,16 @@ app.get('/api/food-images/file/:id', async (req, res) => {
       return;
     }
 
+    const content = toBinaryBuffer(row.content);
+    if (!content.length) {
+      res.status(404).json({ error: 'image_empty' });
+      return;
+    }
+
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
     res.type(String(row.mime_type || 'application/octet-stream'));
-    res.send(row.content);
+    res.set('Content-Length', String(content.length));
+    res.send(content);
   } catch {
     res.status(500).json({ error: 'image_read_failed' });
   }
