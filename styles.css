@@ -1042,6 +1042,14 @@ body.viewer-mode .food-row.row-locked .qty-box input {
   opacity: 0.85;
 }
 
+body.viewer-mode .food-row.row-locked .food-alt-wrap[hidden] {
+  display: none !important;
+}
+
+body.viewer-mode .food-row.row-locked .food-alt-wrap:not([hidden]) .alt-open-btn {
+  display: inline-flex !important;
+}
+
 @media (max-width: 980px) {
   .meal-actions {
     justify-content: flex-start;

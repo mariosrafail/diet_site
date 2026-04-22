@@ -116,6 +116,9 @@ function applyRoleUiState() {
     if (titleEl) titleEl.setAttribute('contenteditable', viewerMode ? 'false' : 'true');
     if (descEl) descEl.setAttribute('contenteditable', viewerMode ? 'false' : 'true');
   });
+
+  // Keep alternatives UI available for non-admin users.
+  renderAlternativeMenus();
 }
 
 function readStoredMealSelections() {
