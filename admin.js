@@ -1,5 +1,6 @@
 const FOODS_API_ENDPOINT = '/api/foods';
 const FOOD_IMAGES_API_ENDPOINT = '/api/food-images';
+const FOOD_IMAGES_CATALOG_ENDPOINT = '/assets/food_images/catalog.json';
 
 const refs = {
   foodDbTable: document.getElementById('foodDbTable'),
@@ -43,10 +44,17 @@ async function fetchFoods() {
 }
 
 async function fetchImageOptions() {
-  const res = await fetch(FOOD_IMAGES_API_ENDPOINT);
-  if (!res.ok) throw new Error('images_fetch_failed');
-  const data = await res.json();
-  imageOptions = Array.isArray(data) ? data : [];
+  const [apiResult, catalogResult] = await Promise.allSettled([
+    fetch(FOOD_IMAGES_API_ENDPOINT, { cache: 'no-store' }).then(res => (res.ok ? res.json() : [])),
+    fetch(FOOD_IMAGES_CATALOG_ENDPOINT, { cache: 'no-store' }).then(res => (res.ok ? res.json() : []))
+  ]);
+
+  const apiPaths = apiResult.status === 'fulfilled' && Array.isArray(apiResult.value) ? apiResult.value : [];
+  const catalogPaths = catalogResult.status === 'fulfilled' && Array.isArray(catalogResult.value) ? catalogResult.value : [];
+
+  imageOptions = Array.from(
+    new Set([...apiPaths, ...catalogPaths].map(path => String(path || '').trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, 'el'));
 }
 
 function renderImageSelect() {
