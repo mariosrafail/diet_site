@@ -23,6 +23,8 @@ const refs = {
   dbProteinInput: document.getElementById('dbProteinInput'),
   dbCarbsInput: document.getElementById('dbCarbsInput'),
   dbFatInput: document.getElementById('dbFatInput'),
+  dbRawCalcEnabledInput: document.getElementById('dbRawCalcEnabledInput'),
+  dbRawMultiplierInput: document.getElementById('dbRawMultiplierInput'),
   dbImageInput: document.getElementById('dbImageInput'),
   dbImageFileInput: document.getElementById('dbImageFileInput'),
   uploadFoodImageBtn: document.getElementById('uploadFoodImageBtn'),
@@ -89,8 +91,15 @@ function normalizeFoodEntry(entry) {
     protein: Number(entry.protein || 0),
     carbs: Number(entry.carbs || 0),
     fat: Number(entry.fat || 0),
-    image_path: String(entry.image_path || 'assets/food_images/placeholder.svg').replace(/\\/g, '/')
+    image_path: String(entry.image_path || 'assets/food_images/placeholder.svg').replace(/\\/g, '/'),
+    raw_calc_enabled: Boolean(entry.raw_calc_enabled),
+    raw_multiplier: entry.raw_multiplier == null ? null : Number(entry.raw_multiplier)
   };
+}
+
+function syncRawCalcInputs() {
+  const enabled = Boolean(refs.dbRawCalcEnabledInput?.checked);
+  if (refs.dbRawMultiplierInput) refs.dbRawMultiplierInput.disabled = !enabled;
 }
 
 async function fetchFoods() {
@@ -171,6 +180,9 @@ function fillForm(food) {
   refs.dbProteinInput.value = String(food.protein);
   refs.dbCarbsInput.value = String(food.carbs);
   refs.dbFatInput.value = String(food.fat);
+  refs.dbRawCalcEnabledInput.checked = Boolean(food.raw_calc_enabled);
+  refs.dbRawMultiplierInput.value = String(food.raw_multiplier || 1.3);
+  syncRawCalcInputs();
   refs.dbImageInput.value = food.image_path || 'assets/food_images/placeholder.svg';
   updateImagePreview();
 }
@@ -291,7 +303,11 @@ async function saveFood() {
     protein: Number(refs.dbProteinInput.value || 0),
     carbs: Number(refs.dbCarbsInput.value || 0),
     fat: Number(refs.dbFatInput.value || 0),
-    image_path: refs.dbImageInput.value
+    image_path: refs.dbImageInput.value,
+    raw_calc_enabled: Boolean(refs.dbRawCalcEnabledInput.checked),
+    raw_multiplier: refs.dbRawCalcEnabledInput.checked
+      ? Number(refs.dbRawMultiplierInput.value || 0)
+      : null
   };
 
   if (!payload.name) return;
@@ -322,6 +338,7 @@ refs.foodCategoryFilter.addEventListener('change', () => {
   activeCategoryFilter = refs.foodCategoryFilter.value || 'all';
   renderFoodsTable();
 });
+refs.dbRawCalcEnabledInput?.addEventListener('change', syncRawCalcInputs);
 refs.saveFoodDbBtn.addEventListener('click', async () => {
   beginLoading('Αποθήκευση...');
   try {
@@ -335,6 +352,7 @@ refs.saveFoodDbBtn.addEventListener('click', async () => {
 });
 
 if (ensureAdminAccess()) {
+  syncRawCalcInputs();
   updateImagePreview();
   reloadData().catch(error => console.error(error));
 }

@@ -83,6 +83,17 @@
             <label><span>F</span><input id="dbFatInput" type="number" min="0" step="0.1" value="3" /></label>
           </div>
 
+          <div class="raw-calc-controls">
+            <label class="raw-calc-toggle">
+              <input id="dbRawCalcEnabledInput" type="checkbox" />
+              <span>Υπολογισμός σε ωμό</span>
+            </label>
+            <label>
+              <span>Multiplier (ωμό/μαγειρεμένο)</span>
+              <input id="dbRawMultiplierInput" type="number" min="0.1" step="0.01" value="1.30" disabled />
+            </label>
+          </div>
+
           <input id="dbImageInput" type="hidden" value="assets/food_images/placeholder.svg" />
 
           <div class="food-upload-row">

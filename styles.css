@@ -985,6 +985,24 @@ select optgroup {
   border-radius: 10px;
 }
 
+.raw-calc-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.raw-calc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.raw-calc-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
 .admin-users-list {
   display: grid;
   gap: 10px;

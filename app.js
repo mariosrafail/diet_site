@@ -63,6 +63,7 @@ const mealGroupSelection = new Map();
 let currentUserSlug = '';
 let currentUserFullName = '';
 let isAdminMode = false;
+let autoSaveTargetsTimer = null;
 
 function isAdminUserSlug(slug) {
   return normalizeUserSlug(slug) === ADMIN_SLUG;
@@ -195,10 +196,27 @@ function setUserGateOpen(isOpen) {
 }
 
 function clearUserSession() {
+  if (autoSaveTargetsTimer) {
+    clearTimeout(autoSaveTargetsTimer);
+    autoSaveTargetsTimer = null;
+  }
   currentUserSlug = '';
   currentUserFullName = '';
   localStorage.removeItem(USER_SLUG_STORAGE_KEY);
   updateActiveUserLabel();
+}
+
+function scheduleAutoSaveTargets(delayMs = 350) {
+  if (!canEditPlan()) return;
+  if (autoSaveTargetsTimer) {
+    clearTimeout(autoSaveTargetsTimer);
+    autoSaveTargetsTimer = null;
+  }
+  autoSaveTargetsTimer = setTimeout(() => {
+    applyTargets({ persistRemote: true }).catch(error => {
+      console.error('Auto-save targets failed:', error);
+    });
+  }, delayMs);
 }
 
 function setHasUnsavedChanges(value) {
@@ -260,7 +278,9 @@ function normalizeFoodEntry(entry) {
     protein: Number(entry.protein || 0),
     carbs: Number(entry.carbs || 0),
     fat: Number(entry.fat || 0),
-    image_path: String(entry.image_path || 'assets/food_images/placeholder.svg').replace(/\\/g, '/')
+    image_path: String(entry.image_path || 'assets/food_images/placeholder.svg').replace(/\\/g, '/'),
+    raw_calc_enabled: Boolean(entry.raw_calc_enabled),
+    raw_multiplier: entry.raw_multiplier == null ? null : Number(entry.raw_multiplier)
   };
 }
 
@@ -522,13 +542,21 @@ function buildFeedback(totals) {
 
 function classifyPrepType(labelText) {
   const text = (labelText || '').toLowerCase();
+  if (text.includes('ρυζαλευρ')) return null;
   if (text.includes('ρυζ') || text.includes('basmati') || text.includes('μπασματ')) return 'rice';
   if (text.includes('μακαρ') || text.includes('σπαγγ') || text.includes('makaron')) return 'pasta';
   return null;
 }
 
-function getCookedWeightProfile(labelText) {
+function getCookedWeightProfile(labelText, row = null) {
+  const customRawCalcEnabled = row?.dataset?.rawCalcEnabled === '1';
+  const customRawMultiplier = Number(row?.dataset?.rawMultiplier || 0);
+  if (customRawCalcEnabled && Number.isFinite(customRawMultiplier) && customRawMultiplier > 0) {
+    return { rawPerCooked: customRawMultiplier, cookedLabel: 'μαγειρεμένο', rawLabel: 'ωμό' };
+  }
+
   const key = toFoodKey(labelText || '');
+  if (key.includes(toFoodKey('Ρυζάλευρο'))) return null;
 
   if (key.includes(toFoodKey('ρυζογκοφρετ')) || key.includes(toFoodKey('rice cake'))) {
     return null;
@@ -598,7 +626,7 @@ function ensureRawHint(row) {
 function updatePrepNoteForRow(row) {
   const labelText = row?.querySelector('.food-main label')?.textContent || '';
   const prepType = classifyPrepType(labelText);
-  const cookedProfile = getCookedWeightProfile(labelText);
+  const cookedProfile = getCookedWeightProfile(labelText, row);
   const existing = row?.querySelector('.prep-note');
   const rawHint = ensureRawHint(row);
   if (rawHint) rawHint.textContent = '';
@@ -667,7 +695,10 @@ function updateUI() {
   refs.fatStatus.textContent = `${shares.fat}%`;
   refs.carbsStatus.textContent = `${shares.carbs}%`;
 
-  refs.feedbackBox.textContent = buildFeedback(totals);
+  if (refs.feedbackBox) {
+    refs.feedbackBox.textContent = '';
+    refs.feedbackBox.style.display = 'none';
+  }
 
   if (dockRefs.totalCalories) {
     dockRefs.totalCalories.textContent = `${totals.calories} kcal`;
@@ -976,6 +1007,8 @@ function applyFoodEntryToRow(row, food) {
   row.dataset.carbs = String(food.carbs);
   row.dataset.fat = String(food.fat);
   row.dataset.imagePath = food.image_path;
+  row.dataset.rawCalcEnabled = food.raw_calc_enabled ? '1' : '0';
+  row.dataset.rawMultiplier = food.raw_multiplier == null ? '' : String(food.raw_multiplier);
 
   const label = row.querySelector('.food-main label');
   const small = row.querySelector('.food-main small');
@@ -989,7 +1022,7 @@ function applyFoodEntryToRow(row, food) {
       else if (grams) small.textContent = `ανά 1 τεμ (${grams} g)`;
       else small.textContent = 'ανά 1 τεμ';
     } else {
-      const cookedProfile = getCookedWeightProfile(food.name);
+      const cookedProfile = getCookedWeightProfile(food.name, row);
       if (cookedProfile) {
         const cookedWord = cookedProfile.cookedLabel || 'μαγειρεμένο';
         small.textContent = `ανά 100 ${food.unit} ${cookedWord} · με εκτίμηση ωμού`;
@@ -1034,6 +1067,8 @@ function createNewFoodRow() {
   row.dataset.protein = '0';
   row.dataset.carbs = '0';
   row.dataset.fat = '0';
+  row.dataset.rawCalcEnabled = '0';
+  row.dataset.rawMultiplier = '';
 
   row.innerHTML = `
     <div class="food-main">
@@ -1387,6 +1422,15 @@ async function loadDashboard() {
 refs.applyTargets?.addEventListener('click', () => {
   if (!canEditPlan()) return;
   applyTargets();
+});
+refs.proteinMultiplier?.addEventListener('change', () => {
+  scheduleAutoSaveTargets(120);
+});
+refs.calorieTargetInput?.addEventListener('input', () => {
+  scheduleAutoSaveTargets();
+});
+refs.weightInput?.addEventListener('input', () => {
+  scheduleAutoSaveTargets();
 });
 
 document.addEventListener('input', e => {

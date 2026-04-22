@@ -184,6 +184,14 @@ function normalizeFoodCategory(raw) {
 
 function normalizeFood(input) {
   const imagePath = normalizeImagePath(input.image_path);
+  const rawCalcRaw = input.raw_calc_enabled;
+  const rawCalcEnabled = rawCalcRaw === true
+    || rawCalcRaw === 1
+    || String(rawCalcRaw || '').toLowerCase() === 'true';
+  const rawMultiplierValue = Number(input.raw_multiplier);
+  const rawMultiplier = rawCalcEnabled && Number.isFinite(rawMultiplierValue) && rawMultiplierValue > 0
+    ? rawMultiplierValue
+    : null;
   return {
     name: String(input.name || '').trim(),
     category: normalizeFoodCategory(input.category || inferCategoryFromImagePath(imagePath)),
@@ -192,7 +200,9 @@ function normalizeFood(input) {
     protein: Number(input.protein || 0),
     carbs: Number(input.carbs || 0),
     fat: Number(input.fat || 0),
-    image_path: imagePath
+    image_path: imagePath,
+    raw_calc_enabled: rawCalcEnabled,
+    raw_multiplier: rawMultiplier
   };
 }
 
@@ -282,6 +292,8 @@ async function ensureSchema() {
           carbs DOUBLE PRECISION NOT NULL CHECK (carbs >= 0),
           fat DOUBLE PRECISION NOT NULL CHECK (fat >= 0),
           image_path TEXT NOT NULL DEFAULT 'assets/food_images/placeholder.svg',
+          raw_calc_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+          raw_multiplier DOUBLE PRECISION,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
@@ -410,6 +422,8 @@ async function ensureSchema() {
            )`,
         [WATER_KEYWORDS.map(keyword => String(keyword).toLowerCase())]
       );
+      await pool.query(`ALTER TABLE foods ADD COLUMN IF NOT EXISTS raw_calc_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
+      await pool.query(`ALTER TABLE foods ADD COLUMN IF NOT EXISTS raw_multiplier DOUBLE PRECISION`);
 
       if (BOOTSTRAP_DEFAULT_DATA) {
         const foodsCountRes = await pool.query('SELECT COUNT(*)::int AS count FROM foods');
@@ -514,7 +528,7 @@ app.get('/api/health', async (_req, res) => {
 
 app.get('/api/foods', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, category, unit, cal, protein, carbs, fat, image_path FROM foods ORDER BY category ASC, name ASC');
+    const result = await pool.query('SELECT id, name, category, unit, cal, protein, carbs, fat, image_path, raw_calc_enabled, raw_multiplier FROM foods ORDER BY category ASC, name ASC');
     res.json(result.rows);
   } catch {
     res.status(500).json({ error: 'read_failed' });
@@ -544,8 +558,8 @@ app.post('/api/foods', async (req, res) => {
   try {
     const key = toFoodKey(food.name);
     const result = await pool.query(
-      `INSERT INTO foods (name, food_key, category, unit, cal, protein, carbs, fat, image_path)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO foods (name, food_key, category, unit, cal, protein, carbs, fat, image_path, raw_calc_enabled, raw_multiplier)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (food_key)
        DO UPDATE SET
          name = EXCLUDED.name,
@@ -556,9 +570,11 @@ app.post('/api/foods', async (req, res) => {
          carbs = EXCLUDED.carbs,
          fat = EXCLUDED.fat,
          image_path = EXCLUDED.image_path,
+         raw_calc_enabled = EXCLUDED.raw_calc_enabled,
+         raw_multiplier = EXCLUDED.raw_multiplier,
          updated_at = NOW()
-       RETURNING id, name, category, unit, cal, protein, carbs, fat, image_path`,
-      [food.name, key, food.category, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
+       RETURNING id, name, category, unit, cal, protein, carbs, fat, image_path, raw_calc_enabled, raw_multiplier`,
+      [food.name, key, food.category, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path, food.raw_calc_enabled, food.raw_multiplier]
     );
     res.json(result.rows[0]);
   } catch {
@@ -696,7 +712,8 @@ app.get('/api/users/:slug/dashboard', async (req, res) => {
       `SELECT m.meal_key, m.title, m.description, m.sort_order,
               i.row_key, i.qty,
               f.id AS food_id, f.name AS food_name, f.category AS food_category, f.unit AS food_unit,
-              f.cal AS food_cal, f.protein AS food_protein, f.carbs AS food_carbs, f.fat AS food_fat, f.image_path AS food_image_path
+              f.cal AS food_cal, f.protein AS food_protein, f.carbs AS food_carbs, f.fat AS food_fat, f.image_path AS food_image_path,
+              f.raw_calc_enabled AS food_raw_calc_enabled, f.raw_multiplier AS food_raw_multiplier
        FROM user_meals m
        LEFT JOIN user_meal_items i ON i.meal_id = m.id
        LEFT JOIN foods f ON f.id = i.food_id
@@ -729,7 +746,9 @@ app.get('/api/users/:slug/dashboard', async (req, res) => {
             protein: Number(row.food_protein),
             carbs: Number(row.food_carbs),
             fat: Number(row.food_fat),
-            image_path: row.food_image_path
+            image_path: row.food_image_path,
+            raw_calc_enabled: Boolean(row.food_raw_calc_enabled),
+            raw_multiplier: row.food_raw_multiplier == null ? null : Number(row.food_raw_multiplier)
           }
         });
       }
