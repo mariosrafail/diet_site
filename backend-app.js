@@ -18,6 +18,15 @@ const pool = new Pool({
 });
 
 const FOOD_CATEGORY_VALUES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
+const IMAGE_MIME_BY_EXT = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.avif': 'image/avif',
+  '.gif': 'image/gif'
+};
 const FRUIT_KEYWORDS = [
   'μηλο', 'μήλο', 'apple',
   'μπανανα', 'μπανάνα', 'banana',
@@ -160,6 +169,10 @@ function normalizeUploadBaseName(raw) {
   return base || 'food-image';
 }
 
+function getImageMimeType(ext) {
+  return IMAGE_MIME_BY_EXT[String(ext || '').toLowerCase()] || 'application/octet-stream';
+}
+
 function getUploadTargetDirCandidates() {
   return [
     path.join(process.cwd(), 'assets', 'food_images'),
@@ -265,6 +278,16 @@ async function ensureSchema() {
           qty DOUBLE PRECISION NOT NULL,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           UNIQUE(meal_id, row_key)
+        );
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS uploaded_images (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          file_name TEXT NOT NULL,
+          mime_type TEXT NOT NULL,
+          content BYTEA NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
       `);
 
@@ -506,11 +529,31 @@ app.get('/api/food-images', async (_req, res) => {
   }
 });
 
+app.get('/api/food-images/file/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT mime_type, content FROM uploaded_images WHERE id = $1 LIMIT 1',
+      [req.params.id]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      res.status(404).json({ error: 'image_not_found' });
+      return;
+    }
+
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.type(String(row.mime_type || 'application/octet-stream'));
+    res.send(row.content);
+  } catch {
+    res.status(500).json({ error: 'image_read_failed' });
+  }
+});
+
 app.post('/api/food-images/upload', async (req, res) => {
   const rawName = String(req.body?.fileName || '').trim();
   const contentBase64 = String(req.body?.contentBase64 || '').trim();
   const ext = path.extname(rawName).toLowerCase();
-  const allowedExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif', '.gif']);
+  const allowedExt = new Set(Object.keys(IMAGE_MIME_BY_EXT));
 
   if (!rawName || !contentBase64) {
     res.status(400).json({ error: 'fileName_contentBase64_required' });
@@ -532,15 +575,29 @@ app.post('/api/food-images/upload', async (req, res) => {
       return;
     }
 
-    const dirPath = await resolveWritableFoodImagesDir();
     const base = normalizeUploadBaseName(rawName);
     const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const fileName = `${base}-${uniqueSuffix}${ext}`;
-    const absolutePath = path.join(dirPath, fileName);
+    const mimeType = getImageMimeType(ext);
 
-    await fs.writeFile(absolutePath, buffer);
-
-    res.json({ path: `assets/food_images/${fileName}` });
+    // Prefer local file save in dev/local. In serverless read-only env, fallback to DB.
+    try {
+      const dirPath = await resolveWritableFoodImagesDir();
+      const absolutePath = path.join(dirPath, fileName);
+      await fs.writeFile(absolutePath, buffer);
+      res.json({ path: `assets/food_images/${fileName}` });
+      return;
+    } catch {
+      const dbInsert = await pool.query(
+        `INSERT INTO uploaded_images (file_name, mime_type, content)
+         VALUES ($1, $2, $3)
+         RETURNING id`,
+        [fileName, mimeType, buffer]
+      );
+      const imageId = dbInsert.rows[0]?.id;
+      if (!imageId) throw new Error('image_insert_failed');
+      res.json({ path: `/api/food-images/file/${imageId}` });
+    }
   } catch {
     res.status(500).json({ error: 'upload_failed' });
   }
