@@ -226,6 +226,28 @@ select optgroup {
   border: 1px solid rgba(255,255,255,0.08);
   animation: cardIn 0.55s ease both;
 }
+.meal-card.totals-inactive {
+  opacity: 0.65;
+}
+.meal-card.totals-active {
+  opacity: 1;
+  border-color: rgba(110,231,183,0.42);
+}
+.meal-card.minimized {
+  padding-bottom: 10px;
+}
+.meal-card.minimized .food-row {
+  display: none;
+}
+.meal-card.minimized .meal-top {
+  margin-bottom: 0;
+}
+.meal-card.minimized .meal-top p {
+  display: none;
+}
+.meal-card.minimized .meal-kcal {
+  opacity: 0.7;
+}
 .meal-card:nth-child(2) { animation-delay: .05s; }
 .meal-card:nth-child(3) { animation-delay: .1s; }
 .meal-card:nth-child(4) { animation-delay: .15s; }
@@ -650,6 +672,11 @@ select optgroup {
   border-color: rgba(248,113,113,0.55);
   background: #522727;
   color: #ffe2e2;
+}
+.mini-btn.calculate-with-this-btn.active {
+  border-color: rgba(110,231,183,0.58);
+  background: #1b463a;
+  color: #ddfdeb;
 }
 
 .save-changes-btn {

@@ -48,6 +48,7 @@ let hasUnsavedChanges = false;
 let saveOverlay = null;
 let saveOverlayLabel = null;
 let pendingSaveCount = 0;
+const mealGroupSelection = new Map();
 
 function setHasUnsavedChanges(value) {
   hasUnsavedChanges = Boolean(value);
@@ -120,6 +121,80 @@ function getAllFoodRows() {
   return Array.from(document.querySelectorAll('.food-row'));
 }
 
+function getMealGroupKey(mealKey) {
+  const key = String(mealKey || '').trim();
+  const altIdx = key.indexOf('-alt-');
+  return altIdx >= 0 ? key.slice(0, altIdx) : key;
+}
+
+function getAllTrackableMealCards() {
+  return Array.from(document.querySelectorAll('.meal-card:not(.sweet-card)'));
+}
+
+function getMealCardsGroupedByKey() {
+  const groups = new Map();
+  getAllTrackableMealCards().forEach(card => {
+    const groupKey = card.dataset.mealGroup || getMealGroupKey(card.dataset.meal || '');
+    if (!groupKey) return;
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey).push(card);
+  });
+  return groups;
+}
+
+function syncMealSelectionControls() {
+  const groups = getMealCardsGroupedByKey();
+
+  const validGroupKeys = new Set(groups.keys());
+  Array.from(mealGroupSelection.keys()).forEach(groupKey => {
+    if (!validGroupKeys.has(groupKey)) mealGroupSelection.delete(groupKey);
+  });
+
+  groups.forEach((cards, groupKey) => {
+    const hasMultiple = cards.length > 1;
+    let selectedMealKey = mealGroupSelection.get(groupKey);
+    if (!selectedMealKey || !cards.some(card => card.dataset.meal === selectedMealKey)) {
+      selectedMealKey = cards[0]?.dataset.meal || '';
+      if (selectedMealKey) mealGroupSelection.set(groupKey, selectedMealKey);
+    }
+
+    cards.forEach(card => {
+      const isSelected = !hasMultiple || card.dataset.meal === selectedMealKey;
+      card.classList.toggle('totals-active', isSelected);
+      card.classList.toggle('totals-inactive', !isSelected);
+      card.classList.toggle('minimized', hasMultiple && !isSelected);
+
+      const chooseBtn = card.querySelector('.calculate-with-this-btn');
+      if (!chooseBtn) return;
+      chooseBtn.hidden = !hasMultiple;
+      chooseBtn.classList.toggle('active', isSelected);
+      chooseBtn.textContent = isSelected ? 'Υπολογίζεται αυτό' : 'Υπολόγισε σύμφωνα με αυτό';
+    });
+  });
+}
+
+function getActiveMealCardsForTotals() {
+  const groups = getMealCardsGroupedByKey();
+  const activeCards = [];
+
+  groups.forEach((cards, groupKey) => {
+    if (cards.length === 1) {
+      activeCards.push(cards[0]);
+      return;
+    }
+
+    let selectedMealKey = mealGroupSelection.get(groupKey);
+    let selectedCard = cards.find(card => card.dataset.meal === selectedMealKey);
+    if (!selectedCard) {
+      selectedCard = cards[0];
+      if (selectedCard?.dataset.meal) mealGroupSelection.set(groupKey, selectedCard.dataset.meal);
+    }
+    if (selectedCard) activeCards.push(selectedCard);
+  });
+
+  return activeCards;
+}
+
 function getRowFactor(row, qty) {
   const unit = normalizeUnit(row.querySelector('.qty-box span')?.textContent || 'g');
   return unit === 'τεμ' ? qty : qty / 100;
@@ -135,13 +210,16 @@ function getPieceGramsForFoodName(name) {
 
 function calculateTotals() {
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  getEditableRows().forEach(row => {
-    const qty = Number(row.querySelector('.qty-box input')?.value || 0);
-    const factor = getRowFactor(row, qty);
-    totals.calories += Number(row.dataset.cal || 0) * factor;
-    totals.protein += Number(row.dataset.protein || 0) * factor;
-    totals.carbs += Number(row.dataset.carbs || 0) * factor;
-    totals.fat += Number(row.dataset.fat || 0) * factor;
+  syncMealSelectionControls();
+  getActiveMealCardsForTotals().forEach(card => {
+    Array.from(card.querySelectorAll('.food-row.editable')).forEach(row => {
+      const qty = Number(row.querySelector('.qty-box input')?.value || 0);
+      const factor = getRowFactor(row, qty);
+      totals.calories += Number(row.dataset.cal || 0) * factor;
+      totals.protein += Number(row.dataset.protein || 0) * factor;
+      totals.carbs += Number(row.dataset.carbs || 0) * factor;
+      totals.fat += Number(row.dataset.fat || 0) * factor;
+    });
   });
 
   totals.calories = round(totals.calories);
@@ -195,6 +273,12 @@ function getCookedWeightProfile(labelText) {
   const hasCookedWord = key.includes(toFoodKey('ψητ')) || key.includes(toFoodKey('βρασ'));
   if (!hasCookedWord) return null;
 
+  if (key.includes(toFoodKey('ρυζ')) || key.includes('basmati') || key.includes(toFoodKey('μπασματ'))) {
+    return { rawPerCooked: 0.37, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
+  }
+  if (key.includes(toFoodKey('μακαρ')) || key.includes(toFoodKey('σπαγγ')) || key.includes('pasta')) {
+    return { rawPerCooked: 0.45, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
+  }
   if (key.includes(toFoodKey('κοτοπουλ'))) {
     return { rawPerCooked: 1.33, cookedLabel: 'ψημένο', rawLabel: 'ωμό' };
   }
@@ -677,6 +761,52 @@ function addFoodToMeal(mealCard) {
   updateUI();
 }
 
+function createAlternativeMealFromCard(sourceMealCard) {
+  if (!sourceMealCard || sourceMealCard.classList.contains('sweet-card')) return null;
+
+  const sourceMealKey = String(sourceMealCard.dataset.meal || 'meal').trim() || 'meal';
+  const sourceGroupKey = sourceMealCard.dataset.mealGroup || getMealGroupKey(sourceMealKey) || sourceMealKey;
+  const sourceTitle = sourceMealCard.querySelector('.meal-top h3')?.textContent?.trim() || 'Γεύμα';
+  const sourceDescription = sourceMealCard.querySelector('.meal-top p')?.textContent?.trim() || '';
+  const altMealKey = `${sourceGroupKey}-alt-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const altTitle = sourceTitle.includes('Εναλλακτική')
+    ? sourceTitle
+    : `${sourceTitle} (Εναλλακτική)`;
+
+  const altMealCard = createMealCard(altMealKey, altTitle, sourceDescription, false);
+  altMealCard.classList.remove('custom-meal');
+  altMealCard.dataset.mealGroup = sourceGroupKey;
+
+  const sourceRows = Array.from(sourceMealCard.querySelectorAll('.food-row.editable'));
+  sourceRows.forEach((sourceRow, idx) => {
+    const newRow = createNewFoodRow();
+    newRow.dataset.rowKey = `row-${Date.now()}-${idx}-${Math.floor(Math.random() * 10000)}`;
+
+    const foodId = getFoodIdFromRow(sourceRow);
+    const food = foodId ? getFoodById(foodId) : null;
+    if (food) {
+      applyFoodEntryToRow(newRow, food);
+      const select = newRow.querySelector('.db-select');
+      if (select) select.value = food.id;
+    }
+
+    const sourceQty = Number(sourceRow.querySelector('.qty-box input')?.value || 0);
+    const qtyInput = newRow.querySelector('.qty-box input');
+    if (qtyInput) qtyInput.value = String(sourceQty);
+
+    altMealCard.appendChild(newRow);
+    prepareRow(newRow, true);
+  });
+
+  if (!sourceRows.length) {
+    const newRow = createNewFoodRow();
+    altMealCard.appendChild(newRow);
+    prepareRow(newRow, true);
+  }
+
+  return altMealCard;
+}
+
 function ensureMealControlButtons(mealCard) {
   if (!mealCard || mealCard.classList.contains('sweet-card')) return;
   const mealTop = mealCard.querySelector('.meal-top');
@@ -696,15 +826,34 @@ function ensureMealControlButtons(mealCard) {
     addFoodBtn.textContent = '+ Νέο τρόφιμο';
     actions.appendChild(addFoodBtn);
   }
+
+  if (!actions.querySelector('.add-alt-meal-btn')) {
+    const addAltMealBtn = document.createElement('button');
+    addAltMealBtn.type = 'button';
+    addAltMealBtn.className = 'mini-btn add-alt-meal-btn';
+    addAltMealBtn.textContent = '+ Εναλλακτικό γεύμα';
+    actions.appendChild(addAltMealBtn);
+  }
+
+  if (!actions.querySelector('.calculate-with-this-btn')) {
+    const chooseForTotalsBtn = document.createElement('button');
+    chooseForTotalsBtn.type = 'button';
+    chooseForTotalsBtn.className = 'mini-btn calculate-with-this-btn';
+    chooseForTotalsBtn.textContent = 'Υπολόγισε σύμφωνα με αυτό';
+    chooseForTotalsBtn.hidden = true;
+    actions.appendChild(chooseForTotalsBtn);
+  }
 }
 
 function createMealCard(mealKey = null, title = null, description = null, includeInitialRow = true) {
   customMealCounter += 1;
   const key = mealKey || `custom-${customMealCounter}`;
+  const mealGroupKey = getMealGroupKey(key) || key;
 
   const card = document.createElement('div');
   card.className = 'meal-card custom-meal';
   card.dataset.meal = key;
+  card.dataset.mealGroup = mealGroupKey;
 
   card.innerHTML = `
     <div class="meal-top">
@@ -715,6 +864,8 @@ function createMealCard(mealKey = null, title = null, description = null, includ
       <span class="meal-kcal">~0 kcal</span>
       <div class="meal-actions">
         <button type="button" class="mini-btn add-food-btn">+ Νέο τρόφιμο</button>
+        <button type="button" class="mini-btn add-alt-meal-btn">+ Εναλλακτικό γεύμα</button>
+        <button type="button" class="mini-btn calculate-with-this-btn" hidden>Υπολόγισε σύμφωνα με αυτό</button>
         <button type="button" class="mini-btn danger remove-meal-btn">Αφαίρεση γεύματος</button>
       </div>
     </div>
@@ -757,6 +908,7 @@ function ensureAddMealButton() {
 function setupMealButtons() {
   document.querySelectorAll('.meal-card').forEach(ensureMealControlButtons);
   ensureAddMealButton();
+  syncMealSelectionControls();
 }
 
 function openImageModal(src, alt = 'Εικόνα τροφίμου') {
@@ -1013,6 +1165,32 @@ document.addEventListener('click', e => {
     return;
   }
 
+  const addAltMealBtn = e.target.closest('.add-alt-meal-btn');
+  if (addAltMealBtn) {
+    const sourceMealCard = addAltMealBtn.closest('.meal-card');
+    const altMealCard = createAlternativeMealFromCard(sourceMealCard);
+    if (!altMealCard || !sourceMealCard?.parentElement) return;
+
+    sourceMealCard.parentElement.insertBefore(altMealCard, sourceMealCard.nextSibling);
+    refreshDbSelectOptions();
+    syncMealSelectionControls();
+    markUnsavedChanges();
+    updateUI();
+    return;
+  }
+
+  const calculateWithThisBtn = e.target.closest('.calculate-with-this-btn');
+  if (calculateWithThisBtn) {
+    const mealCard = calculateWithThisBtn.closest('.meal-card');
+    const groupKey = mealCard?.dataset.mealGroup;
+    const mealKey = mealCard?.dataset.meal;
+    if (!mealCard || !groupKey || !mealKey) return;
+    mealGroupSelection.set(groupKey, mealKey);
+    syncMealSelectionControls();
+    updateUI();
+    return;
+  }
+
   const removeRowBtn = e.target.closest('.row-remove-btn, .remove-row-btn');
   if (removeRowBtn) {
     removeRowBtn.closest('.food-row')?.remove();
@@ -1024,6 +1202,7 @@ document.addEventListener('click', e => {
   const removeMealBtn = e.target.closest('.remove-meal-btn');
   if (removeMealBtn) {
     removeMealBtn.closest('.meal-card')?.remove();
+    syncMealSelectionControls();
     saveDashboardChanges(true).catch(error => {
       console.error('Failed to auto-save after meal removal:', error);
       markUnsavedChanges();
