@@ -2,6 +2,9 @@
   publish = "."
   functions = "netlify/functions"
 
+[functions]
+  included_files = ["assets/food_images/**"]
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/api/:splat"

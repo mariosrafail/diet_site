@@ -9,6 +9,7 @@
   carbsBar: document.getElementById('carbsBar'),
   calorieStatus: document.getElementById('calorieStatus'),
   proteinStatus: document.getElementById('proteinStatus'),
+  proteinGoalLabel: document.getElementById('proteinGoalLabel'),
   fatStatus: document.getElementById('fatStatus'),
   carbsStatus: document.getElementById('carbsStatus'),
   feedbackBox: document.getElementById('feedbackBox'),
@@ -225,14 +226,24 @@ function updateUI() {
 
   const calPct = Math.min(140, round((totals.calories / targets.calories) * 100));
   const proteinPct = Math.min(140, round((totals.protein / targets.protein) * 100));
+  const fatMin = 25;
+  const fatMax = 30;
+  const carbsMin = 35;
+  const carbsMax = 45;
+  const inRangeFill = (value, min, max) => {
+    if (value >= min && value <= max) return 100;
+    if (value < min) return Math.max(0, Math.min(100, round((value / min) * 100)));
+    return Math.max(0, Math.min(100, round((max / value) * 100)));
+  };
 
   refs.calorieBar.style.width = `${Math.min(calPct, 100)}%`;
   refs.proteinBar.style.width = `${Math.min(proteinPct, 100)}%`;
-  refs.fatBar.style.width = `${Math.min(100, shares.fat)}%`;
-  refs.carbsBar.style.width = `${Math.min(100, shares.carbs)}%`;
+  refs.fatBar.style.width = `${inRangeFill(shares.fat, fatMin, fatMax)}%`;
+  refs.carbsBar.style.width = `${inRangeFill(shares.carbs, carbsMin, carbsMax)}%`;
 
   const proteinRemaining = round(targets.protein - totals.protein);
 
+  if (refs.proteinGoalLabel) refs.proteinGoalLabel.textContent = `Πρωτεΐνη (στόχος ${targets.protein} g)`;
   refs.calorieStatus.textContent = `${calPct}%`;
   if (proteinRemaining > 0) refs.proteinStatus.textContent = `${proteinPct}% · μένουν ${proteinRemaining} g`;
   else if (proteinRemaining < 0) refs.proteinStatus.textContent = `${proteinPct}% · +${Math.abs(proteinRemaining)} g`;
