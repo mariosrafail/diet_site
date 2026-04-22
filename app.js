@@ -393,9 +393,13 @@ function syncMealSelectionControls() {
 
       const chooseBtn = card.querySelector('.calculate-with-this-btn');
       if (!chooseBtn) return;
-      chooseBtn.hidden = !hasMultiple || !canEditPlan();
+      chooseBtn.hidden = !hasMultiple;
       chooseBtn.classList.toggle('active', isSelected);
-      chooseBtn.textContent = isSelected ? 'Υπολογίζεται αυτό' : 'Υπολόγισε σύμφωνα με αυτό';
+      if (canEditPlan()) {
+        chooseBtn.textContent = isSelected ? 'Υπολογίζεται αυτό' : 'Υπολόγισε σύμφωνα με αυτό';
+      } else {
+        chooseBtn.textContent = isSelected ? 'Προβάλλεται αυτό' : 'Δες αυτό το γεύμα';
+      }
     });
   });
 
@@ -1519,7 +1523,6 @@ document.addEventListener('click', e => {
 
   const calculateWithThisBtn = e.target.closest('.calculate-with-this-btn');
   if (calculateWithThisBtn) {
-    if (!canEditPlan()) return;
     const mealCard = calculateWithThisBtn.closest('.meal-card');
     const groupKey = mealCard?.dataset.mealGroup;
     const mealKey = mealCard?.dataset.meal;

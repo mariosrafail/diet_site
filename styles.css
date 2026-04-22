@@ -1019,7 +1019,6 @@ body.viewer-mode .save-changes-btn,
 body.viewer-mode .meal-actions > .add-food-btn,
 body.viewer-mode .meal-actions > .add-alt-meal-btn,
 body.viewer-mode .meal-actions > .remove-meal-btn,
-body.viewer-mode .meal-actions > .calculate-with-this-btn,
 body.viewer-mode .food-row .row-actions,
 body.viewer-mode .food-row .db-picker {
   display: none !important;
