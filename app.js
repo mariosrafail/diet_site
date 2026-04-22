@@ -624,7 +624,7 @@ function ensureMealControlButtons(mealCard) {
   }
 }
 
-function createMealCard(mealKey = null, title = null, description = null) {
+function createMealCard(mealKey = null, title = null, description = null, includeInitialRow = true) {
   customMealCounter += 1;
   const key = mealKey || `custom-${customMealCounter}`;
 
@@ -646,7 +646,7 @@ function createMealCard(mealKey = null, title = null, description = null) {
     </div>
   `;
 
-  card.appendChild(createNewFoodRow());
+  if (includeInitialRow) card.appendChild(createNewFoodRow());
   return card;
 }
 
@@ -736,26 +736,8 @@ function applyDashboardTargets(targetsData) {
   if (Number.isFinite(weight)) refs.weightInput.value = String(weight);
 }
 
-function findOrCreateMealCard(meal) {
-  let card = document.querySelector(`.meal-card[data-meal="${meal.mealKey}"]`);
-  if (card) return card;
-
-  const newCard = createMealCard(meal.mealKey, meal.title, meal.description);
-  const sweetCard = document.querySelector('.meal-card.sweet-card');
-  if (sweetCard?.parentElement) sweetCard.parentElement.insertBefore(newCard, sweetCard);
-  else document.querySelector('.panel.glass.meals')?.appendChild(newCard);
-
-  return newCard;
-}
-
-function ensureRowWithKey(mealCard, rowKey) {
-  let row = mealCard.querySelector(`.food-row.editable[data-row-key="${rowKey}"]`);
-  if (row) return row;
-
-  row = createNewFoodRow();
-  row.dataset.rowKey = rowKey;
-  mealCard.appendChild(row);
-  return row;
+function clearDashboardMealCards() {
+  document.querySelectorAll('.meal-card:not(.sweet-card)').forEach(card => card.remove());
 }
 
 function collectDashboardPayload() {
@@ -818,21 +800,41 @@ async function loadDashboard() {
 
   applyDashboardTargets(data.targets);
 
+  clearDashboardMealCards();
+  const sweetCard = document.querySelector('.meal-card.sweet-card');
+  const mealsPanel = document.querySelector('.panel.glass.meals');
+
   (data.meals || []).forEach(meal => {
-    const card = findOrCreateMealCard(meal);
+    const card = createMealCard(meal.mealKey, meal.title, meal.description, false);
+    card.classList.remove('custom-meal');
 
     (meal.items || []).forEach(item => {
-      const row = ensureRowWithKey(card, item.rowKey);
+      if (!item?.food) return;
+      const row = createNewFoodRow();
+      row.dataset.rowKey = String(item.rowKey || `row-${Date.now()}-${Math.floor(Math.random() * 10000)}`);
       applyFoodEntryToRow(row, normalizeFoodEntry(item.food));
+
       const qtyInput = row.querySelector('.qty-box input');
       if (qtyInput) qtyInput.value = String(item.qty);
 
       const select = row.querySelector('.db-select');
       if (select) select.value = item.food.id;
+
+      card.appendChild(row);
+      prepareRow(row, true);
     });
+
+    if (!card.querySelector('.food-row.editable')) {
+      const row = createNewFoodRow();
+      card.appendChild(row);
+      prepareRow(row, true);
+    }
+
+    if (sweetCard?.parentElement) sweetCard.parentElement.insertBefore(card, sweetCard);
+    else mealsPanel?.appendChild(card);
   });
 
-  getEditableRows().forEach(row => prepareRow(row, true));
+  setupMealButtons();
 }
 
 refs.applyTargets?.addEventListener('click', applyTargets);
@@ -944,9 +946,7 @@ async function initApp() {
   beginSaving('Φόρτωση δεδομένων...');
   try {
     foodDb = await fetchFoodsFromApi();
-    getEditableRows().forEach(row => prepareRow(row, true));
     refreshDbSelectOptions();
-    setupMealButtons();
 
     await loadDashboard();
 
