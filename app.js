@@ -356,6 +356,10 @@ function classifyPrepType(labelText) {
 function getCookedWeightProfile(labelText) {
   const key = toFoodKey(labelText || '');
 
+  if (key.includes(toFoodKey('ρυζογκοφρετ')) || key.includes(toFoodKey('rice cake'))) {
+    return null;
+  }
+
   // For rice/pasta we treat qty as cooked by default in this plan,
   // even if the word "βρασμένο" is not explicitly present.
   if (key.includes(toFoodKey('ρυζ')) || key.includes('basmati') || key.includes(toFoodKey('μπασματ'))) {
