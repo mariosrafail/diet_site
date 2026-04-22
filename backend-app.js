@@ -22,7 +22,7 @@ const DEFAULT_FOOD_DB = [
   { name: 'Κατίκι Δομοκού ΗΠΕΙΡΟΣ', unit: 'g', cal: 169, protein: 10, carbs: 3, fat: 13, image_path: 'assets/food_images/katiki.jpg' },
   { name: 'Στήθος κοτόπουλο ψητό', unit: 'g', cal: 165, protein: 31, carbs: 0, fat: 3.6, image_path: 'assets/food_images/placeholder.svg' },
   { name: 'Ρύζι basmati βρασμένο', unit: 'g', cal: 351, protein: 7.5, carbs: 76, fat: 1.3, image_path: 'assets/food_images/basmati.jpg' },
-  { name: 'Ελαιόλαδο', unit: 'g', cal: 884, protein: 0, carbs: 0, fat: 100, image_path: 'assets/food_images/placeholder.svg' },
+  { name: 'Ελαιόλαδο', unit: 'g', cal: 884, protein: 0, carbs: 0, fat: 100, image_path: 'assets/food_images/ladi.jpg' },
   { name: 'Τρικαλινό ελαφρύ', unit: 'g', cal: 234, protein: 36, carbs: 0, fat: 10, image_path: 'assets/food_images/trikalino.jpg' },
   { name: 'ΝΙΚΑΣ Μπριζόλα σε φέτες', unit: 'g', cal: 111, protein: 18.2, carbs: 3.1, fat: 2.9, image_path: 'assets/food_images/mprizola.jpeg' },
   { name: 'AGRINO Ρυζογκοφρέτες με ρίγανη', unit: 'τεμ', cal: 29, protein: 0.64, carbs: 5.3, fat: 0.5, image_path: 'assets/food_images/ruzogkofretes.jpg' },
@@ -211,6 +211,14 @@ async function ensureSchema() {
           [mealRes.rows[0].id, item.row_key, foodRes.rows[0].id, item.qty]
         );
       }
+
+      // One-time compatibility fix: migrate olive oil image from placeholder to ladi.jpg.
+      await pool.query(
+        `UPDATE foods
+         SET image_path = $1, updated_at = NOW()
+         WHERE food_key = $2 AND image_path = $3`,
+        ['assets/food_images/ladi.jpg', toFoodKey('Ελαιόλαδο'), 'assets/food_images/placeholder.svg']
+      );
     })();
   }
 
