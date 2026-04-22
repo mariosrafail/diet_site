@@ -292,7 +292,7 @@ async function applyTargets(options = {}) {
 }
 
 async function fetchFoodsFromApi() {
-  const response = await fetch(FOODS_API_ENDPOINT);
+  const response = await fetch(FOODS_API_ENDPOINT, { cache: 'no-store' });
   if (!response.ok) throw new Error('foods_fetch_failed');
   const data = await response.json();
   if (!Array.isArray(data)) throw new Error('foods_invalid_payload');
@@ -794,7 +794,7 @@ async function saveDashboardChanges(silent = false) {
 }
 
 async function loadDashboard() {
-  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`);
+  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`, { cache: 'no-store' });
   if (!response.ok) throw new Error('dashboard_fetch_failed');
   const data = await response.json();
 
@@ -945,6 +945,7 @@ async function initApp() {
   setupAlternativeDropdowns();
   beginSaving('Φόρτωση δεδομένων...');
   try {
+    clearDashboardMealCards();
     foodDb = await fetchFoodsFromApi();
     refreshDbSelectOptions();
 
@@ -960,6 +961,9 @@ async function initApp() {
 
 initApp().catch(error => {
   console.error('Init failed:', error);
-  applyTargets({ persistRemote: false }).catch(() => {});
+  if (refs.feedbackBox) {
+    refs.feedbackBox.textContent = 'Αποτυχία φόρτωσης δεδομένων από τη βάση. Κάνε refresh ή έλεγξε το backend.';
+  }
+  endSaving();
 });
 
