@@ -182,16 +182,21 @@ async function ensureSchema() {
         );
       `);
 
-      for (const entry of DEFAULT_FOOD_DB) {
-        const food = normalizeFood(entry);
-        const key = toFoodKey(food.name);
-        await pool.query(
-          `INSERT INTO foods (name, food_key, unit, cal, protein, carbs, fat, image_path)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (food_key)
-           DO NOTHING`,
-          [food.name, key, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
-        );
+      const foodsCountRes = await pool.query('SELECT COUNT(*)::int AS count FROM foods');
+      const shouldSeedFoods = Number(foodsCountRes.rows[0]?.count || 0) === 0;
+
+      if (shouldSeedFoods) {
+        for (const entry of DEFAULT_FOOD_DB) {
+          const food = normalizeFood(entry);
+          const key = toFoodKey(food.name);
+          await pool.query(
+            `INSERT INTO foods (name, food_key, unit, cal, protein, carbs, fat, image_path)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (food_key)
+             DO NOTHING`,
+            [food.name, key, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
+          );
+        }
       }
 
       const userResult = await pool.query(
@@ -202,40 +207,43 @@ async function ensureSchema() {
          RETURNING id`,
         [DEFAULT_USER.slug, DEFAULT_USER.full_name]
       );
+      const isNewDefaultUser = userResult.rowCount > 0;
       const userId = userResult.rows[0]?.id
         || (await pool.query('SELECT id FROM users WHERE slug = $1', [DEFAULT_USER.slug])).rows[0]?.id;
       if (!userId) throw new Error('failed_to_resolve_default_user');
 
-      await pool.query(
-        `INSERT INTO user_targets (user_id, calorie_target, protein_multiplier, weight)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (user_id)
-         DO NOTHING`,
-        [userId, DEFAULT_USER.calorieTarget, DEFAULT_USER.proteinMultiplier, DEFAULT_USER.weight]
-      );
-
-      for (const meal of DEFAULT_MEALS) {
+      if (isNewDefaultUser) {
         await pool.query(
-          `INSERT INTO user_meals (user_id, meal_key, title, description, sort_order)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (user_id, meal_key)
-           DO NOTHING`,
-          [userId, meal.meal_key, meal.title, meal.description, meal.sort_order]
-        );
-      }
-
-      for (const item of DEFAULT_MEAL_ITEMS) {
-        const mealRes = await pool.query('SELECT id FROM user_meals WHERE user_id = $1 AND meal_key = $2', [userId, item.meal_key]);
-        const foodRes = await pool.query('SELECT id FROM foods WHERE food_key = $1', [toFoodKey(item.food_name)]);
-        if (!mealRes.rows[0] || !foodRes.rows[0]) continue;
-
-        await pool.query(
-          `INSERT INTO user_meal_items (meal_id, row_key, food_id, qty)
+          `INSERT INTO user_targets (user_id, calorie_target, protein_multiplier, weight)
            VALUES ($1, $2, $3, $4)
-           ON CONFLICT (meal_id, row_key)
+           ON CONFLICT (user_id)
            DO NOTHING`,
-          [mealRes.rows[0].id, item.row_key, foodRes.rows[0].id, item.qty]
+          [userId, DEFAULT_USER.calorieTarget, DEFAULT_USER.proteinMultiplier, DEFAULT_USER.weight]
         );
+
+        for (const meal of DEFAULT_MEALS) {
+          await pool.query(
+            `INSERT INTO user_meals (user_id, meal_key, title, description, sort_order)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (user_id, meal_key)
+             DO NOTHING`,
+            [userId, meal.meal_key, meal.title, meal.description, meal.sort_order]
+          );
+        }
+
+        for (const item of DEFAULT_MEAL_ITEMS) {
+          const mealRes = await pool.query('SELECT id FROM user_meals WHERE user_id = $1 AND meal_key = $2', [userId, item.meal_key]);
+          const foodRes = await pool.query('SELECT id FROM foods WHERE food_key = $1', [toFoodKey(item.food_name)]);
+          if (!mealRes.rows[0] || !foodRes.rows[0]) continue;
+
+          await pool.query(
+            `INSERT INTO user_meal_items (meal_id, row_key, food_id, qty)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (meal_id, row_key)
+             DO NOTHING`,
+            [mealRes.rows[0].id, item.row_key, foodRes.rows[0].id, item.qty]
+          );
+        }
       }
 
       // One-time compatibility fix: migrate olive oil image from placeholder to ladi.jpg.
