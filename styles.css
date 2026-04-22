@@ -59,7 +59,7 @@ body.saving {
 .hero, .layout { position: relative; z-index: 1; }
 .hero {
   margin: 24px auto 18px;
-  width: min(1200px, calc(100% - 24px));
+  width: min(1440px, calc(100% - 24px));
   border-radius: 28px;
   padding: 28px;
   display: grid;
@@ -71,8 +71,8 @@ body.saving {
   margin-bottom: 14px;
 }
 .hero-brand img {
-  width: 56px;
-  height: 56px;
+  width: 78px;
+  height: 78px;
   object-fit: contain;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.14);
@@ -109,7 +109,7 @@ h1 { margin: 0; font-size: clamp(34px, 5vw, 54px); line-height: 1.05; }
 .stat-label, .metric-box span, .total-box span { color: var(--muted); display: block; margin-bottom: 8px; }
 .stat-card strong { font-size: 34px; display: block; }
 .layout {
-  width: min(1200px, calc(100% - 24px));
+  width: min(1440px, calc(100% - 24px));
   margin: 0 auto 40px;
   display: grid;
   grid-template-columns: 1fr;
@@ -257,19 +257,44 @@ select optgroup {
   border-color: rgba(110,231,183,0.42);
 }
 .meal-card.minimized {
-  padding-bottom: 10px;
+  padding: 10px 12px;
 }
 .meal-card.minimized .food-row {
   display: none;
 }
 .meal-card.minimized .meal-top {
-  margin-bottom: 0;
+  margin: 0;
+  justify-content: space-between;
+  align-items: center;
 }
+.meal-card.minimized .meal-top > div:first-child {
+  display: block;
+}
+.meal-card.minimized .meal-top > div:first-child h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.meal-card.minimized .meal-top > div:first-child p,
 .meal-card.minimized .meal-top p {
   display: none;
 }
 .meal-card.minimized .meal-kcal {
-  opacity: 0.7;
+  display: inline-flex;
+  margin-left: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.meal-card.minimized .meal-actions {
+  width: auto;
+  margin-left: 8px;
+  justify-content: flex-end;
+}
+.meal-card.minimized .meal-actions > :not(.calculate-with-this-btn) {
+  display: none !important;
+}
+.meal-card.minimized .meal-actions .calculate-with-this-btn {
+  display: inline-flex;
 }
 .meal-card:nth-child(2) { animation-delay: .05s; }
 .meal-card:nth-child(3) { animation-delay: .1s; }
@@ -613,7 +638,7 @@ select optgroup {
 }
 @media (max-width: 640px) {
   .hero, .panel { padding: 18px; border-radius: 22px; }
-  .hero-brand img { width: 48px; height: 48px; border-radius: 12px; }
+  .hero-brand img { width: 84px; height: 84px; border-radius: 14px; }
   .metric-grid, .grocery-grid, .totals-grid, .sweet-grid, .controls-grid, .macro-targets { grid-template-columns: 1fr; }
   .stat-card strong, .metric-box strong, .total-box strong { font-size: 24px; }
   .meal-top { flex-direction: column; }

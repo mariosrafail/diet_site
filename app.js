@@ -131,6 +131,22 @@ function getAllTrackableMealCards() {
   return Array.from(document.querySelectorAll('.meal-card:not(.sweet-card)'));
 }
 
+function ensureMealTitleEditing() {
+  getAllTrackableMealCards().forEach(card => {
+    const titleEl = card.querySelector('.meal-top h3');
+    const descEl = card.querySelector('.meal-top p');
+
+    if (titleEl) {
+      titleEl.classList.add('editable-text');
+      titleEl.setAttribute('contenteditable', 'true');
+    }
+    if (descEl) {
+      descEl.classList.add('editable-text');
+      descEl.setAttribute('contenteditable', 'true');
+    }
+  });
+}
+
 function getMealCardsGroupedByKey() {
   const groups = new Map();
   getAllTrackableMealCards().forEach(card => {
@@ -339,15 +355,23 @@ function classifyPrepType(labelText) {
 
 function getCookedWeightProfile(labelText) {
   const key = toFoodKey(labelText || '');
-  const hasCookedWord = key.includes(toFoodKey('ψητ')) || key.includes(toFoodKey('βρασ'));
-  if (!hasCookedWord) return null;
 
+  // For rice/pasta we treat qty as cooked by default in this plan,
+  // even if the word "βρασμένο" is not explicitly present.
   if (key.includes(toFoodKey('ρυζ')) || key.includes('basmati') || key.includes(toFoodKey('μπασματ'))) {
     return { rawPerCooked: 0.37, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
   }
   if (key.includes(toFoodKey('μακαρ')) || key.includes(toFoodKey('σπαγγ')) || key.includes('pasta')) {
     return { rawPerCooked: 0.5, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
   }
+  if (key.includes(toFoodKey('κιμα')) && key.includes(toFoodKey('μοσχαρ'))) {
+    // Default handling for beef mince in this plan: treated as cooked/boiled portion.
+    return { rawPerCooked: 0.9, cookedLabel: 'βρασμένο', rawLabel: 'ωμό' };
+  }
+
+  const hasCookedWord = key.includes(toFoodKey('ψητ')) || key.includes(toFoodKey('βρασ'));
+  if (!hasCookedWord) return null;
+
   if (key.includes(toFoodKey('κοτοπουλ'))) {
     return { rawPerCooked: 1.33, cookedLabel: 'ψημένο', rawLabel: 'ωμό' };
   }
@@ -728,11 +752,35 @@ function ensureRowActions(row) {
   const actions = document.createElement('div');
   actions.className = 'row-actions';
   actions.innerHTML = `
+    <button type="button" class="icon-btn row-up-btn" title="Πάνω" aria-label="Πάνω">↑</button>
+    <button type="button" class="icon-btn row-down-btn" title="Κάτω" aria-label="Κάτω">↓</button>
     <button type="button" class="icon-btn row-edit-btn" title="Επεξεργασία" aria-label="Επεξεργασία">✎</button>
     <button type="button" class="icon-btn row-save-btn" title="Save" aria-label="Save" hidden>💾</button>
     <button type="button" class="icon-btn danger row-remove-btn" title="Αφαίρεση" aria-label="Αφαίρεση">🗑</button>
   `;
   row.appendChild(actions);
+}
+
+function getNeighborEditableRow(row, direction) {
+  if (!row) return null;
+  let cursor = row;
+  while (cursor) {
+    cursor = direction === 'up' ? cursor.previousElementSibling : cursor.nextElementSibling;
+    if (!cursor) return null;
+    if (cursor.classList.contains('food-row') && cursor.classList.contains('editable')) return cursor;
+  }
+  return null;
+}
+
+function moveFoodRow(row, direction) {
+  if (!row?.parentElement) return false;
+  const neighbor = getNeighborEditableRow(row, direction);
+  if (!neighbor) return false;
+
+  const parent = row.parentElement;
+  if (direction === 'up') parent.insertBefore(row, neighbor);
+  else parent.insertBefore(neighbor, row);
+  return true;
 }
 
 function prepareRow(row, locked = true) {
@@ -764,7 +812,10 @@ function applyFoodEntryToRow(row, food) {
       else small.textContent = 'ανά 1 τεμ';
     } else {
       const cookedProfile = getCookedWeightProfile(food.name);
-      if (cookedProfile) small.textContent = `ανά 100 ${food.unit} μαγειρεμένο`;
+      if (cookedProfile) {
+        const cookedWord = cookedProfile.cookedLabel || 'μαγειρεμένο';
+        small.textContent = `ανά 100 ${food.unit} ${cookedWord} · με εκτίμηση ωμού`;
+      }
       else small.textContent = `ανά 100 ${food.unit}`;
     }
   }
@@ -981,6 +1032,7 @@ function ensureAddMealButton() {
 
 function setupMealButtons() {
   document.querySelectorAll('.meal-card').forEach(ensureMealControlButtons);
+  ensureMealTitleEditing();
   ensureAddMealButton();
   organizeMealGroupsInDom();
   syncMealSelectionControls();
@@ -1048,7 +1100,15 @@ function collectDashboardPayload() {
     const title = card.querySelector('.meal-top h3')?.textContent?.trim() || mealKey;
     const description = card.querySelector('.meal-top p')?.textContent?.trim() || '';
 
-    const items = Array.from(card.querySelectorAll('.food-row.editable')).map(row => {
+    const rows = Array.from(card.querySelectorAll('.food-row.editable'));
+    rows.forEach((row, rowIdx) => {
+      const fallback = `row-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const existing = String(row.dataset.rowKey || fallback).trim() || fallback;
+      const rawSuffix = existing.replace(/^\d{3}-/, '');
+      row.dataset.rowKey = `${String(rowIdx + 1).padStart(3, '0')}-${rawSuffix}`;
+    });
+
+    const items = rows.map(row => {
       if (!row.dataset.rowKey) row.dataset.rowKey = `row-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       return {
         rowKey: row.dataset.rowKey,
@@ -1164,6 +1224,28 @@ document.addEventListener('click', e => {
   const thumb = e.target.closest('.food-thumb');
   if (thumb) {
     openImageModal(thumb.src, thumb.alt || 'Εικόνα τροφίμου');
+    return;
+  }
+
+  const rowUpBtn = e.target.closest('.row-up-btn');
+  if (rowUpBtn) {
+    const row = rowUpBtn.closest('.food-row');
+    if (!row) return;
+    if (!moveFoodRow(row, 'up')) return;
+    markUnsavedChanges();
+    renderAlternativeMenus();
+    updateUI();
+    return;
+  }
+
+  const rowDownBtn = e.target.closest('.row-down-btn');
+  if (rowDownBtn) {
+    const row = rowDownBtn.closest('.food-row');
+    if (!row) return;
+    if (!moveFoodRow(row, 'down')) return;
+    markUnsavedChanges();
+    renderAlternativeMenus();
+    updateUI();
     return;
   }
 

@@ -25,6 +25,8 @@ const refs = {
   uploadFoodImageBtn: document.getElementById('uploadFoodImageBtn'),
   currentImagePath: document.getElementById('currentImagePath'),
   uploadFoodImageStatus: document.getElementById('uploadFoodImageStatus'),
+  adminLoadingOverlay: document.getElementById('adminLoadingOverlay'),
+  adminLoadingOverlayLabel: document.getElementById('adminLoadingOverlayLabel'),
   imagePreview: document.getElementById('imagePreview'),
   imagePreviewText: document.getElementById('imagePreviewText'),
   saveFoodDbBtn: document.getElementById('saveFoodDbBtn')
@@ -32,6 +34,24 @@ const refs = {
 
 let foods = [];
 let activeCategoryFilter = 'all';
+let pendingLoadingCount = 0;
+
+function beginLoading(label = 'Φόρτωση...') {
+  pendingLoadingCount += 1;
+  if (!refs.adminLoadingOverlay) return;
+  if (refs.adminLoadingOverlayLabel) refs.adminLoadingOverlayLabel.textContent = label;
+  refs.adminLoadingOverlay.classList.add('open');
+  refs.adminLoadingOverlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('saving');
+}
+
+function endLoading() {
+  pendingLoadingCount = Math.max(0, pendingLoadingCount - 1);
+  if (pendingLoadingCount > 0 || !refs.adminLoadingOverlay) return;
+  refs.adminLoadingOverlay.classList.remove('open');
+  refs.adminLoadingOverlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('saving');
+}
 
 function round(value) {
   return Math.round(value * 10) / 10;
@@ -91,6 +111,7 @@ async function uploadSelectedImage() {
 
   refs.uploadFoodImageStatus.textContent = 'Γίνεται upload...';
   refs.uploadFoodImageBtn.disabled = true;
+  beginLoading('Upload εικόνας...');
 
   try {
     const contentBase64 = await fileToBase64(file);
@@ -112,6 +133,7 @@ async function uploadSelectedImage() {
     refs.uploadFoodImageStatus.textContent = 'Αποτυχία upload. Δοκίμασε ξανά.';
   } finally {
     refs.uploadFoodImageBtn.disabled = false;
+    endLoading();
   }
 }
 
@@ -215,8 +237,13 @@ async function saveFood() {
 }
 
 async function reloadData() {
-  await fetchFoods();
-  renderFoodsTable();
+  beginLoading('Φόρτωση δεδομένων...');
+  try {
+    await fetchFoods();
+    renderFoodsTable();
+  } finally {
+    endLoading();
+  }
 }
 
 refs.uploadFoodImageBtn.addEventListener('click', () => {
@@ -227,11 +254,14 @@ refs.foodCategoryFilter.addEventListener('change', () => {
   renderFoodsTable();
 });
 refs.saveFoodDbBtn.addEventListener('click', async () => {
+  beginLoading('Αποθήκευση...');
   try {
     await saveFood();
     await reloadData();
   } catch (error) {
     console.error(error);
+  } finally {
+    endLoading();
   }
 });
 
