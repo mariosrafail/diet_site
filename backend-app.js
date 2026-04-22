@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const dotenv = require('dotenv');
 const { Pool } = require('pg');
 const fs = require('fs/promises');
@@ -28,83 +28,111 @@ const IMAGE_MIME_BY_EXT = {
   '.gif': 'image/gif'
 };
 const FRUIT_KEYWORDS = [
-  'μηλο', 'μήλο', 'apple',
-  'μπανανα', 'μπανάνα', 'banana',
-  'πορτοκαλι', 'πορτοκάλι', 'orange',
-  'μανταρινι', 'μανταρίνι', 'mandarin',
-  'αχλαδι', 'αχλάδι', 'pear',
-  'ροδακινο', 'ροδάκινο', 'peach',
-  'νεκταρινι', 'νεκταρίνι', 'nectarine',
-  'βερικοκο', 'βερίκοκο', 'apricot',
-  'κερασι', 'κεράσι', 'cherry',
-  'σταφυλι', 'σταφύλι', 'grape',
-  'ακτινιδιο', 'ακτινίδιο', 'kiwi',
-  'φραουλα', 'φράουλα', 'strawberry',
-  'βατομουρ', 'raspberry',
+  'Î¼Î·Î»Î¿', 'Î¼Î®Î»Î¿', 'apple',
+  'Î¼Ï€Î±Î½Î±Î½Î±', 'Î¼Ï€Î±Î½Î¬Î½Î±', 'banana',
+  'Ï€Î¿ÏÏ„Î¿ÎºÎ±Î»Î¹', 'Ï€Î¿ÏÏ„Î¿ÎºÎ¬Î»Î¹', 'orange',
+  'Î¼Î±Î½Ï„Î±ÏÎ¹Î½Î¹', 'Î¼Î±Î½Ï„Î±ÏÎ¯Î½Î¹', 'mandarin',
+  'Î±Ï‡Î»Î±Î´Î¹', 'Î±Ï‡Î»Î¬Î´Î¹', 'pear',
+  'ÏÎ¿Î´Î±ÎºÎ¹Î½Î¿', 'ÏÎ¿Î´Î¬ÎºÎ¹Î½Î¿', 'peach',
+  'Î½ÎµÎºÏ„Î±ÏÎ¹Î½Î¹', 'Î½ÎµÎºÏ„Î±ÏÎ¯Î½Î¹', 'nectarine',
+  'Î²ÎµÏÎ¹ÎºÎ¿ÎºÎ¿', 'Î²ÎµÏÎ¯ÎºÎ¿ÎºÎ¿', 'apricot',
+  'ÎºÎµÏÎ±ÏƒÎ¹', 'ÎºÎµÏÎ¬ÏƒÎ¹', 'cherry',
+  'ÏƒÏ„Î±Ï†Ï…Î»Î¹', 'ÏƒÏ„Î±Ï†ÏÎ»Î¹', 'grape',
+  'Î±ÎºÏ„Î¹Î½Î¹Î´Î¹Î¿', 'Î±ÎºÏ„Î¹Î½Î¯Î´Î¹Î¿', 'kiwi',
+  'Ï†ÏÎ±Î¿Ï…Î»Î±', 'Ï†ÏÎ¬Î¿Ï…Î»Î±', 'strawberry',
+  'Î²Î±Ï„Î¿Î¼Î¿Ï…Ï', 'raspberry',
   'blueberry', 'cranberry',
-  'καρπουζι', 'καρπούζι', 'watermelon',
-  'πεπονι', 'πεπόνι', 'melon',
-  'ανανας', 'ανανάς', 'pineapple',
-  'mango', 'μανγκο', 'μάνγκο',
-  'papaya', 'παπαγια', 'παπάγια',
-  'ροδι', 'ρόδι', 'pomegranate',
-  'δαμασκηνο', 'δαμάσκηνο', 'plum',
-  'συκο', 'σύκο', 'fig',
-  'χουρμα', 'χουρμά', 'date',
-  'λεμονι', 'λεμόνι', 'lemon',
+  'ÎºÎ±ÏÏ€Î¿Ï…Î¶Î¹', 'ÎºÎ±ÏÏ€Î¿ÏÎ¶Î¹', 'watermelon',
+  'Ï€ÎµÏ€Î¿Î½Î¹', 'Ï€ÎµÏ€ÏŒÎ½Î¹', 'melon',
+  'Î±Î½Î±Î½Î±Ï‚', 'Î±Î½Î±Î½Î¬Ï‚', 'pineapple',
+  'mango', 'Î¼Î±Î½Î³ÎºÎ¿', 'Î¼Î¬Î½Î³ÎºÎ¿',
+  'papaya', 'Ï€Î±Ï€Î±Î³Î¹Î±', 'Ï€Î±Ï€Î¬Î³Î¹Î±',
+  'ÏÎ¿Î´Î¹', 'ÏÏŒÎ´Î¹', 'pomegranate',
+  'Î´Î±Î¼Î±ÏƒÎºÎ·Î½Î¿', 'Î´Î±Î¼Î¬ÏƒÎºÎ·Î½Î¿', 'plum',
+  'ÏƒÏ…ÎºÎ¿', 'ÏƒÏÎºÎ¿', 'fig',
+  'Ï‡Î¿Ï…ÏÎ¼Î±', 'Ï‡Î¿Ï…ÏÎ¼Î¬', 'date',
+  'Î»ÎµÎ¼Î¿Î½Î¹', 'Î»ÎµÎ¼ÏŒÎ½Î¹', 'lemon',
   'lime', 'limes',
-  'γκρειπφρουτ', 'grapefruit'
+  'Î³ÎºÏÎµÎ¹Ï€Ï†ÏÎ¿Ï…Ï„', 'grapefruit'
 ];
-const WATER_KEYWORDS = ['νερο', 'νερό', 'water'];
+const WATER_KEYWORDS = ['Î½ÎµÏÎ¿', 'Î½ÎµÏÏŒ', 'water'];
 
 const DEFAULT_FOOD_DB = [
-  { name: 'Αυγά αχυρώνα ΜΑΡΑΤΑ μεσαία', unit: 'τεμ', cal: 82.5, protein: 7.2, carbs: 0.6, fat: 6.1, image_path: 'assets/food_images/auga.jpg' },
-  { name: 'Ασπράδι αυγού ΒΛΑΧΑΚΗ', unit: 'ml', cal: 50, protein: 10, carbs: 1.1, fat: 0.5, image_path: 'assets/food_images/aspradi.jpg' },
-  { name: 'Ψωμί τοστ', unit: 'τεμ', cal: 66.4, protein: 2.7, carbs: 10.8, fat: 1, image_path: 'assets/food_images/psomi.jpg' },
+  { name: 'Î‘Ï…Î³Î¬ Î±Ï‡Ï…ÏÏŽÎ½Î± ÎœÎ‘Î¡Î‘Î¤Î‘ Î¼ÎµÏƒÎ±Î¯Î±', unit: 'Ï„ÎµÎ¼', cal: 82.5, protein: 7.2, carbs: 0.6, fat: 6.1, image_path: 'assets/food_images/auga.jpg' },
+  { name: 'Î‘ÏƒÏ€ÏÎ¬Î´Î¹ Î±Ï…Î³Î¿Ï Î’Î›Î‘Î§Î‘ÎšÎ—', unit: 'ml', cal: 50, protein: 10, carbs: 1.1, fat: 0.5, image_path: 'assets/food_images/aspradi.jpg' },
+  { name: 'Î¨Ï‰Î¼Î¯ Ï„Î¿ÏƒÏ„', unit: 'Ï„ÎµÎ¼', cal: 66.4, protein: 2.7, carbs: 10.8, fat: 1, image_path: 'assets/food_images/psomi.jpg' },
   { name: 'Cottage ADORO', unit: 'g', cal: 83, protein: 12.7, carbs: 3.1, fat: 2.2, image_path: 'assets/food_images/cottage.jpg' },
-  { name: 'Κατίκι Δομοκού ΗΠΕΙΡΟΣ', unit: 'g', cal: 169, protein: 10, carbs: 3, fat: 13, image_path: 'assets/food_images/katiki.jpg' },
-  { name: 'Στήθος κοτόπουλο ψητό', unit: 'g', cal: 165, protein: 31, carbs: 0, fat: 3.6, image_path: 'assets/food_images/placeholder.svg' },
-  { name: 'Ρύζι basmati βρασμένο', unit: 'g', cal: 351, protein: 7.5, carbs: 76, fat: 1.3, image_path: 'assets/food_images/basmati.jpg' },
-  { name: 'Ελαιόλαδο', unit: 'g', cal: 884, protein: 0, carbs: 0, fat: 100, image_path: 'assets/food_images/ladi.jpg' },
-  { name: 'Τρικαλινό ελαφρύ', unit: 'g', cal: 234, protein: 36, carbs: 0, fat: 10, image_path: 'assets/food_images/trikalino.jpg' },
-  { name: 'ΝΙΚΑΣ Μπριζόλα σε φέτες', unit: 'g', cal: 111, protein: 18.2, carbs: 3.1, fat: 2.9, image_path: 'assets/food_images/mprizola.jpeg' },
-  { name: 'AGRINO Ρυζογκοφρέτες με ρίγανη', unit: 'τεμ', cal: 29, protein: 0.64, carbs: 5.3, fat: 0.5, image_path: 'assets/food_images/ruzogkofretes.jpg' },
-  { name: 'Μπισκότο πρωτεΐνης', unit: 'g', cal: 386, protein: 29.1, carbs: 34.6, fat: 18.1, image_path: 'assets/food_images/mpiskot.jpg' },
-  { name: 'Ξηροι καρποι', unit: 'g', cal: 567, protein: 21, carbs: 19, fat: 53, image_path: 'assets/food_images/kshroi.jpg' },
-  { name: 'Μακαρόνια βρασμένα', unit: 'g', cal: 360, protein: 12, carbs: 74, fat: 1.5, image_path: 'assets/food_images/makaronia.jpg' }
+  { name: 'ÎšÎ±Ï„Î¯ÎºÎ¹ Î”Î¿Î¼Î¿ÎºÎ¿Ï Î—Î Î•Î™Î¡ÎŸÎ£', unit: 'g', cal: 169, protein: 10, carbs: 3, fat: 13, image_path: 'assets/food_images/katiki.jpg' },
+  { name: 'Î£Ï„Î®Î¸Î¿Ï‚ ÎºÎ¿Ï„ÏŒÏ€Î¿Ï…Î»Î¿ ÏˆÎ·Ï„ÏŒ', unit: 'g', cal: 165, protein: 31, carbs: 0, fat: 3.6, image_path: 'assets/food_images/placeholder.svg' },
+  { name: 'Î¡ÏÎ¶Î¹ basmati Î²ÏÎ±ÏƒÎ¼Î­Î½Î¿', unit: 'g', cal: 351, protein: 7.5, carbs: 76, fat: 1.3, image_path: 'assets/food_images/basmati.jpg' },
+  { name: 'Î•Î»Î±Î¹ÏŒÎ»Î±Î´Î¿', unit: 'g', cal: 884, protein: 0, carbs: 0, fat: 100, image_path: 'assets/food_images/ladi.jpg' },
+  { name: 'Î¤ÏÎ¹ÎºÎ±Î»Î¹Î½ÏŒ ÎµÎ»Î±Ï†ÏÏ', unit: 'g', cal: 234, protein: 36, carbs: 0, fat: 10, image_path: 'assets/food_images/trikalino.jpg' },
+  { name: 'ÎÎ™ÎšÎ‘Î£ ÎœÏ€ÏÎ¹Î¶ÏŒÎ»Î± ÏƒÎµ Ï†Î­Ï„ÎµÏ‚', unit: 'g', cal: 111, protein: 18.2, carbs: 3.1, fat: 2.9, image_path: 'assets/food_images/mprizola.jpeg' },
+  { name: 'AGRINO Î¡Ï…Î¶Î¿Î³ÎºÎ¿Ï†ÏÎ­Ï„ÎµÏ‚ Î¼Îµ ÏÎ¯Î³Î±Î½Î·', unit: 'Ï„ÎµÎ¼', cal: 29, protein: 0.64, carbs: 5.3, fat: 0.5, image_path: 'assets/food_images/ruzogkofretes.jpg' },
+  { name: 'ÎœÏ€Î¹ÏƒÎºÏŒÏ„Î¿ Ï€ÏÏ‰Ï„ÎµÎÎ½Î·Ï‚', unit: 'g', cal: 386, protein: 29.1, carbs: 34.6, fat: 18.1, image_path: 'assets/food_images/mpiskot.jpg' },
+  { name: 'ÎžÎ·ÏÎ¿Î¹ ÎºÎ±ÏÏ€Î¿Î¹', unit: 'g', cal: 567, protein: 21, carbs: 19, fat: 53, image_path: 'assets/food_images/kshroi.jpg' },
+  { name: 'ÎœÎ±ÎºÎ±ÏÏŒÎ½Î¹Î± Î²ÏÎ±ÏƒÎ¼Î­Î½Î±', unit: 'g', cal: 360, protein: 12, carbs: 74, fat: 1.5, image_path: 'assets/food_images/makaronia.jpg' }
 ];
 
-const DEFAULT_USER = {
-  slug: 'konstantinos',
-  full_name: 'Κωνσταντίνος Τασιούλης',
-  weight: 93,
-  proteinMultiplier: 1.7,
-  calorieTarget: 2500
-};
-
-const DEFAULT_MEALS = [
-  { meal_key: 'breakfast', title: 'Πρωινό', description: 'Αυγό + ασπράδια + υδατάνθρακας', sort_order: 1 },
-  { meal_key: 'lunch', title: 'Μεσημεριανό', description: 'Κυρίως πρωτεΐνη + carb', sort_order: 2 },
-  { meal_key: 'snack', title: 'Σνακ', description: 'Γρήγορο', sort_order: 3 },
-  { meal_key: 'dinner', title: 'Βραδινό', description: 'Εναλλαγή', sort_order: 4 }
-];
-
-const DEFAULT_MEAL_ITEMS = [
-  { meal_key: 'breakfast', row_key: 'breakfast-eggs', food_name: 'Αυγά αχυρώνα ΜΑΡΑΤΑ μεσαία', qty: 1 },
-  { meal_key: 'breakfast', row_key: 'breakfast-eggwhite', food_name: 'Ασπράδι αυγού ΒΛΑΧΑΚΗ', qty: 300 },
-  { meal_key: 'breakfast', row_key: 'breakfast-toast', food_name: 'Ψωμί τοστ', qty: 4 },
-  { meal_key: 'breakfast', row_key: 'breakfast-cottage', food_name: 'Cottage ADORO', qty: 150 },
-  { meal_key: 'lunch', row_key: 'lunch-chicken', food_name: 'Στήθος κοτόπουλο ψητό', qty: 250 },
-  { meal_key: 'lunch', row_key: 'lunch-rice', food_name: 'Ρύζι basmati βρασμένο', qty: 250 },
-  { meal_key: 'lunch', row_key: 'lunch-oil', food_name: 'Ελαιόλαδο', qty: 10 },
-  { meal_key: 'snack', row_key: 'snack-toast', food_name: 'Ψωμί τοστ', qty: 3 },
-  { meal_key: 'dinner', row_key: 'dinner-pasta', food_name: 'Μακαρόνια βρασμένα', qty: 200 }
+const DEFAULT_USER_PROFILES = [
+  {
+    user: {
+      slug: 'konstantinos',
+      full_name: 'Konstantinos',
+      weight: 93,
+      proteinMultiplier: 1.7,
+      calorieTarget: 2500
+    },
+    meals: [
+      { meal_key: 'breakfast', title: 'Πρωινό', description: 'Αυγό + ασπράδια + υδατάνθρακας', sort_order: 1 },
+      { meal_key: 'lunch', title: 'Μεσημεριανό', description: 'Πρωτεΐνη + υδατάνθρακας + λίπος', sort_order: 2 },
+      { meal_key: 'snack', title: 'Σνακ', description: 'Γρήγορο ενδιάμεσο', sort_order: 3 },
+      { meal_key: 'dinner', title: 'Βραδινό', description: 'Εναλλαγή πρωτεΐνης + carb', sort_order: 4 }
+    ],
+    items: [
+      { meal_key: 'breakfast', row_key: 'breakfast-eggs', food_name: 'Î‘Ï…Î³Î¬ Î±Ï‡Ï…ÏÏŽÎ½Î± ÎœÎ‘Î¡Î‘Î¤Î‘ Î¼ÎµÏƒÎ±Î¯Î±', qty: 1 },
+      { meal_key: 'breakfast', row_key: 'breakfast-eggwhite', food_name: 'Î‘ÏƒÏ€ÏÎ¬Î´Î¹ Î±Ï…Î³Î¿Ï Î’Î›Î‘Î§Î‘ÎšÎ—', qty: 300 },
+      { meal_key: 'breakfast', row_key: 'breakfast-toast', food_name: 'Î¨Ï‰Î¼Î¯ Ï„Î¿ÏƒÏ„', qty: 4 },
+      { meal_key: 'breakfast', row_key: 'breakfast-cottage', food_name: 'Cottage ADORO', qty: 150 },
+      { meal_key: 'lunch', row_key: 'lunch-chicken', food_name: 'Î£Ï„Î®Î¸Î¿Ï‚ ÎºÎ¿Ï„ÏŒÏ€Î¿Ï…Î»Î¿ ÏˆÎ·Ï„ÏŒ', qty: 250 },
+      { meal_key: 'lunch', row_key: 'lunch-rice', food_name: 'Î¡ÏÎ¶Î¹ basmati Î²ÏÎ±ÏƒÎ¼Î­Î½Î¿', qty: 250 },
+      { meal_key: 'lunch', row_key: 'lunch-oil', food_name: 'Î•Î»Î±Î¹ÏŒÎ»Î±Î´Î¿', qty: 10 },
+      { meal_key: 'snack', row_key: 'snack-toast', food_name: 'Î¨Ï‰Î¼Î¯ Ï„Î¿ÏƒÏ„', qty: 3 },
+      { meal_key: 'dinner', row_key: 'dinner-pasta', food_name: 'ÎœÎ±ÎºÎ±ÏÏŒÎ½Î¹Î± Î²ÏÎ±ÏƒÎ¼Î­Î½Î±', qty: 200 }
+    ]
+  },
+  {
+    user: {
+      slug: 'marios',
+      full_name: 'Marios',
+      weight: 85,
+      proteinMultiplier: 1.8,
+      calorieTarget: 2350
+    },
+    meals: [
+      { meal_key: 'breakfast', title: 'Πρωινό', description: 'Πρωτεΐνη + φρούτο', sort_order: 1 },
+      { meal_key: 'lunch', title: 'Μεσημεριανό', description: 'Κύριο γεύμα', sort_order: 2 },
+      { meal_key: 'snack', title: 'Σνακ', description: 'Ελαφρύ ενδιάμεσο', sort_order: 3 },
+      { meal_key: 'dinner', title: 'Βραδινό', description: 'Πρωτεΐνη + carbs', sort_order: 4 }
+    ],
+    items: [
+      { meal_key: 'breakfast', row_key: 'breakfast-eggwhite', food_name: 'Î‘ÏƒÏ€ÏÎ¬Î´Î¹ Î±Ï…Î³Î¿Ï Î’Î›Î‘Î§Î‘ÎšÎ—', qty: 260 },
+      { meal_key: 'breakfast', row_key: 'breakfast-cottage', food_name: 'Cottage ADORO', qty: 180 },
+      { meal_key: 'lunch', row_key: 'lunch-chicken', food_name: 'Î£Ï„Î®Î¸Î¿Ï‚ ÎºÎ¿Ï„ÏŒÏ€Î¿Ï…Î»Î¿ ÏˆÎ·Ï„ÏŒ', qty: 220 },
+      { meal_key: 'lunch', row_key: 'lunch-rice', food_name: 'Î¡ÏÎ¶Î¹ basmati Î²ÏÎ±ÏƒÎ¼Î­Î½Î¿', qty: 280 },
+      { meal_key: 'lunch', row_key: 'lunch-oil', food_name: 'Î•Î»Î±Î¹ÏŒÎ»Î±Î´Î¿', qty: 8 },
+      { meal_key: 'snack', row_key: 'snack-rice-cakes', food_name: 'AGRINO Î¡Ï…Î¶Î¿Î³ÎºÎ¿Ï†ÏÎ­Ï„ÎµÏ‚ Î¼Îµ ÏÎ¯Î³Î±Î½Î·', qty: 4 },
+      { meal_key: 'snack', row_key: 'snack-nuts', food_name: 'ÎžÎ·ÏÎ¿Î¹ ÎºÎ±ÏÏ€Î¿Î¹', qty: 20 },
+      { meal_key: 'dinner', row_key: 'dinner-mince', food_name: 'ÎÎ™ÎšÎ‘Î£ ÎœÏ€ÏÎ¹Î¶ÏŒÎ»Î± ÏƒÎµ Ï†Î­Ï„ÎµÏ‚', qty: 220 },
+      { meal_key: 'dinner', row_key: 'dinner-pasta', food_name: 'ÎœÎ±ÎºÎ±ÏÏŒÎ½Î¹Î± Î²ÏÎ±ÏƒÎ¼Î­Î½Î±', qty: 180 }
+    ]
+  }
 ];
 
 function normalizeUnit(raw) {
   const unit = String(raw || 'g').toLowerCase();
   if (unit === 'ml') return 'ml';
-  if (unit.startsWith('τεμ')) return 'τεμ';
+  if (unit.startsWith('Ï„ÎµÎ¼')) return 'Ï„ÎµÎ¼';
   return 'g';
 }
 
@@ -133,12 +161,12 @@ function normalizeFoodCategory(raw) {
   const value = String(raw || '').trim().toLowerCase();
   if (FOOD_CATEGORY_VALUES.includes(value)) return value;
 
-  if (value === 'vegetable' || value === 'vegetables' || value === 'veg' || value === 'λαχανικα' || value === 'λαχανικά') return 'vegetables';
-  if (value === 'fruit' || value === 'fruits' || value === 'fruit_carb' || value === 'frouta' || value === 'φρουτα' || value === 'φρούτα') return 'fruit';
-  if (value === 'protein' || value === 'proteins' || value === 'πρωτεινη' || value === 'πρωτεΐνη') return 'protein';
-  if (value === 'carb' || value === 'carbs' || value === 'carbohydrate' || value === 'υδατανθρακας' || value === 'υδατανθράκας' || value === 'υδατανθρακες' || value === 'υδατάνθρακες') return 'carb';
-  if (value === 'fat' || value === 'fats' || value === 'λιπαρα' || value === 'λιπαρά') return 'fat';
-  if (value === 'water' || value === 'νερο' || value === 'νερό') return 'water';
+  if (value === 'vegetable' || value === 'vegetables' || value === 'veg' || value === 'Î»Î±Ï‡Î±Î½Î¹ÎºÎ±' || value === 'Î»Î±Ï‡Î±Î½Î¹ÎºÎ¬') return 'vegetables';
+  if (value === 'fruit' || value === 'fruits' || value === 'fruit_carb' || value === 'frouta' || value === 'Ï†ÏÎ¿Ï…Ï„Î±' || value === 'Ï†ÏÎ¿ÏÏ„Î±') return 'fruit';
+  if (value === 'protein' || value === 'proteins' || value === 'Ï€ÏÏ‰Ï„ÎµÎ¹Î½Î·' || value === 'Ï€ÏÏ‰Ï„ÎµÎÎ½Î·') return 'protein';
+  if (value === 'carb' || value === 'carbs' || value === 'carbohydrate' || value === 'Ï…Î´Î±Ï„Î±Î½Î¸ÏÎ±ÎºÎ±Ï‚' || value === 'Ï…Î´Î±Ï„Î±Î½Î¸ÏÎ¬ÎºÎ±Ï‚' || value === 'Ï…Î´Î±Ï„Î±Î½Î¸ÏÎ±ÎºÎµÏ‚' || value === 'Ï…Î´Î±Ï„Î¬Î½Î¸ÏÎ±ÎºÎµÏ‚') return 'carb';
+  if (value === 'fat' || value === 'fats' || value === 'Î»Î¹Ï€Î±ÏÎ±' || value === 'Î»Î¹Ï€Î±ÏÎ¬') return 'fat';
+  if (value === 'water' || value === 'Î½ÎµÏÎ¿' || value === 'Î½ÎµÏÏŒ') return 'water';
 
   return 'protein';
 }
@@ -237,7 +265,7 @@ async function ensureSchema() {
           name TEXT NOT NULL,
           food_key TEXT NOT NULL UNIQUE,
           category TEXT NOT NULL DEFAULT 'protein' CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat', 'water')),
-          unit TEXT NOT NULL CHECK (unit IN ('g', 'ml', 'τεμ')),
+          unit TEXT NOT NULL CHECK (unit IN ('g', 'ml', 'Ï„ÎµÎ¼')),
           cal DOUBLE PRECISION NOT NULL CHECK (cal >= 0),
           protein DOUBLE PRECISION NOT NULL CHECK (protein >= 0),
           carbs DOUBLE PRECISION NOT NULL CHECK (carbs >= 0),
@@ -390,29 +418,35 @@ async function ensureSchema() {
           }
         }
 
-        const userResult = await pool.query(
-          `INSERT INTO users (slug, full_name)
-           VALUES ($1, $2)
-           ON CONFLICT (slug)
-           DO NOTHING
-           RETURNING id`,
-          [DEFAULT_USER.slug, DEFAULT_USER.full_name]
-        );
-        const isNewDefaultUser = userResult.rowCount > 0;
-        const userId = userResult.rows[0]?.id
-          || (await pool.query('SELECT id FROM users WHERE slug = $1', [DEFAULT_USER.slug])).rows[0]?.id;
-        if (!userId) throw new Error('failed_to_resolve_default_user');
+        for (const profile of DEFAULT_USER_PROFILES) {
+          const baseUser = profile?.user || {};
+          const meals = Array.isArray(profile?.meals) ? profile.meals : [];
+          const items = Array.isArray(profile?.items) ? profile.items : [];
 
-        if (isNewDefaultUser) {
+          const userResult = await pool.query(
+            `INSERT INTO users (slug, full_name)
+             VALUES ($1, $2)
+             ON CONFLICT (slug)
+             DO NOTHING
+             RETURNING id`,
+            [baseUser.slug, baseUser.full_name]
+          );
+          const isNewUser = userResult.rowCount > 0;
+          const userId = userResult.rows[0]?.id
+            || (await pool.query('SELECT id FROM users WHERE slug = $1', [baseUser.slug])).rows[0]?.id;
+          if (!userId) throw new Error(`failed_to_resolve_default_user_${baseUser.slug}`);
+
+          if (!isNewUser) continue;
+
           await pool.query(
             `INSERT INTO user_targets (user_id, calorie_target, protein_multiplier, weight)
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (user_id)
              DO NOTHING`,
-            [userId, DEFAULT_USER.calorieTarget, DEFAULT_USER.proteinMultiplier, DEFAULT_USER.weight]
+            [userId, baseUser.calorieTarget, baseUser.proteinMultiplier, baseUser.weight]
           );
 
-          for (const meal of DEFAULT_MEALS) {
+          for (const meal of meals) {
             await pool.query(
               `INSERT INTO user_meals (user_id, meal_key, title, description, sort_order)
                VALUES ($1, $2, $3, $4, $5)
@@ -422,7 +456,7 @@ async function ensureSchema() {
             );
           }
 
-          for (const item of DEFAULT_MEAL_ITEMS) {
+          for (const item of items) {
             const mealRes = await pool.query('SELECT id FROM user_meals WHERE user_id = $1 AND meal_key = $2', [userId, item.meal_key]);
             const foodRes = await pool.query('SELECT id FROM foods WHERE food_key = $1', [toFoodKey(item.food_name)]);
             if (!mealRes.rows[0] || !foodRes.rows[0]) continue;
@@ -726,7 +760,7 @@ app.post('/api/users/:slug/meal-items', async (req, res) => {
   const rowKey = String(req.body?.rowKey || '').trim();
   const foodId = String(req.body?.foodId || '').trim();
   const qty = Number(req.body?.qty || 0);
-  const mealTitle = String(req.body?.mealTitle || mealKey || 'Νέο γεύμα').trim();
+  const mealTitle = String(req.body?.mealTitle || mealKey || 'ÎÎ­Î¿ Î³ÎµÏÎ¼Î±').trim();
 
   if (!mealKey || !rowKey || !foodId) {
     res.status(400).json({ error: 'mealKey_rowKey_foodId_required' });
@@ -837,4 +871,5 @@ module.exports = {
   app,
   ensureSchema
 };
+
 

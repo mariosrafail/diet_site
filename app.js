@@ -18,7 +18,15 @@
   weightInput: document.getElementById('weightInput'),
   goalCalories: document.getElementById('goalCalories'),
   goalProtein: document.getElementById('goalProtein'),
-  applyTargets: document.getElementById('applyTargets')
+  applyTargets: document.getElementById('applyTargets'),
+  heroTitle: document.querySelector('.hero h1'),
+  userGate: document.getElementById('userGate'),
+  userGateForm: document.getElementById('userGateForm'),
+  userSlugInput: document.getElementById('userSlugInput'),
+  userSlugSubmit: document.getElementById('userSlugSubmit'),
+  userGateError: document.getElementById('userGateError'),
+  activeUserLabel: document.getElementById('activeUserLabel'),
+  logoutBtn: document.getElementById('logoutBtn')
 };
 
 const dockRefs = {
@@ -29,7 +37,7 @@ const dockRefs = {
 };
 
 const FOODS_API_ENDPOINT = '/api/foods';
-const USER_SLUG = 'konstantinos';
+const USER_SLUG_STORAGE_KEY = 'diet_user_slug';
 const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
 const FOOD_CATEGORY_LABELS = {
   vegetables: 'Λαχανικά',
@@ -49,6 +57,41 @@ let saveOverlay = null;
 let saveOverlayLabel = null;
 let pendingSaveCount = 0;
 const mealGroupSelection = new Map();
+let currentUserSlug = '';
+let currentUserFullName = '';
+
+function normalizeUserSlug(rawSlug) {
+  return String(rawSlug || '').trim().toLowerCase();
+}
+
+function getActiveUserSlug() {
+  if (!currentUserSlug) throw new Error('user_slug_missing');
+  return currentUserSlug;
+}
+
+function userApiPath(pathSuffix) {
+  return `/api/users/${encodeURIComponent(getActiveUserSlug())}/${pathSuffix}`;
+}
+
+function updateActiveUserLabel() {
+  if (!refs.activeUserLabel) return;
+  const nameOrSlug = currentUserFullName || currentUserSlug || '-';
+  refs.activeUserLabel.textContent = `User: ${nameOrSlug}`;
+}
+
+function setUserGateOpen(isOpen) {
+  if (!refs.userGate) return;
+  refs.userGate.classList.toggle('open', isOpen);
+  refs.userGate.setAttribute('aria-hidden', String(!isOpen));
+  document.body.classList.toggle('auth-locked', isOpen);
+}
+
+function clearUserSession() {
+  currentUserSlug = '';
+  currentUserFullName = '';
+  localStorage.removeItem(USER_SLUG_STORAGE_KEY);
+  updateActiveUserLabel();
+}
 
 function setHasUnsavedChanges(value) {
   hasUnsavedChanges = Boolean(value);
@@ -507,7 +550,7 @@ function updateUI() {
 }
 
 async function saveTargetsRemote() {
-  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/targets`, {
+  const response = await fetch(userApiPath('targets'), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -842,7 +885,7 @@ async function saveRowForUser(row, foodId) {
 
   beginSaving('Αποθήκευση...');
   try {
-    const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/meal-items`, {
+    const response = await fetch(userApiPath('meal-items'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mealKey, rowKey: row.dataset.rowKey, foodId, qty, mealTitle })
@@ -1137,7 +1180,7 @@ async function saveDashboardChanges(silent = false) {
   beginSaving('Αποθήκευση...');
   try {
   const payload = collectDashboardPayload();
-  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`, {
+  const response = await fetch(userApiPath('dashboard'), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -1160,9 +1203,13 @@ async function saveDashboardChanges(silent = false) {
 }
 
 async function loadDashboard() {
-  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`, { cache: 'no-store' });
+  const response = await fetch(userApiPath('dashboard'), { cache: 'no-store' });
+  if (response.status === 404) throw new Error('user_not_found');
   if (!response.ok) throw new Error('dashboard_fetch_failed');
   const data = await response.json();
+  currentUserFullName = String(data?.user?.full_name || '').trim();
+  if (refs.heroTitle && currentUserFullName) refs.heroTitle.textContent = currentUserFullName;
+  updateActiveUserLabel();
 
   applyDashboardTargets(data.targets);
 
@@ -1201,6 +1248,7 @@ async function loadDashboard() {
   });
 
   setupMealButtons();
+  return data;
 }
 
 refs.applyTargets?.addEventListener('click', applyTargets);
@@ -1392,10 +1440,29 @@ async function initApp() {
   saveOverlay = document.getElementById('savingOverlay');
   saveOverlayLabel = document.getElementById('savingOverlayLabel');
   setupImageModal();
+  updateActiveUserLabel();
+}
+
+async function startUserSession(slug, options = {}) {
+  const { showError = true } = options;
+  const normalizedSlug = normalizeUserSlug(slug);
+  if (!normalizedSlug) return false;
+
+  if (refs.userGateError) refs.userGateError.hidden = true;
+  if (refs.userSlugSubmit) refs.userSlugSubmit.disabled = true;
+
+  currentUserSlug = normalizedSlug;
+  currentUserFullName = '';
+  updateActiveUserLabel();
+
   beginSaving('Φόρτωση δεδομένων...');
   try {
     clearDashboardMealCards();
-    foodDb = await fetchFoodsFromApi();
+    mealGroupSelection.clear();
+
+    if (!foodDb.length) {
+      foodDb = await fetchFoodsFromApi();
+    }
     refreshDbSelectOptions();
 
     await loadDashboard();
@@ -1404,16 +1471,60 @@ async function initApp() {
     renderAlternativeMenus();
     await applyTargets({ persistRemote: false });
     setHasUnsavedChanges(false);
+    localStorage.setItem(USER_SLUG_STORAGE_KEY, normalizedSlug);
+    setUserGateOpen(false);
+    return true;
+  } catch (error) {
+    clearUserSession();
+    clearDashboardMealCards();
+    setUserGateOpen(true);
+    if (refs.userSlugInput) refs.userSlugInput.value = normalizedSlug;
+    if (showError && refs.userGateError) refs.userGateError.hidden = false;
+    if (refs.feedbackBox) {
+      refs.feedbackBox.textContent = error?.message === 'user_not_found'
+        ? 'Δεν βρέθηκε χρήστης με αυτό το slug.'
+        : 'Αποτυχία φόρτωσης δεδομένων από τη βάση. Κάνε refresh ή έλεγξε το backend.';
+    }
+    console.error('User session failed:', error);
+    return false;
   } finally {
+    if (refs.userSlugSubmit) refs.userSlugSubmit.disabled = false;
     endSaving();
   }
 }
 
-initApp().catch(error => {
-  console.error('Init failed:', error);
-  if (refs.feedbackBox) {
-    refs.feedbackBox.textContent = 'Αποτυχία φόρτωσης δεδομένων από τη βάση. Κάνε refresh ή έλεγξε το backend.';
+function setupAuthHandlers() {
+  refs.userGateForm?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const slug = normalizeUserSlug(refs.userSlugInput?.value || '');
+    await startUserSession(slug, { showError: true });
+  });
+
+  refs.logoutBtn?.addEventListener('click', () => {
+    clearUserSession();
+    clearDashboardMealCards();
+    setHasUnsavedChanges(false);
+    setUserGateOpen(true);
+    if (refs.userSlugInput) {
+      refs.userSlugInput.value = '';
+      refs.userSlugInput.focus();
+    }
+    if (refs.userGateError) refs.userGateError.hidden = true;
+  });
+}
+
+initApp().then(async () => {
+  setupAuthHandlers();
+  const cachedSlug = normalizeUserSlug(localStorage.getItem(USER_SLUG_STORAGE_KEY));
+  if (cachedSlug) {
+    await startUserSession(cachedSlug, { showError: false });
+    return;
   }
-  endSaving();
+  setUserGateOpen(true);
+  if (refs.userSlugInput) refs.userSlugInput.focus();
+}).catch(error => {
+  console.error('Init failed:', error);
+  setUserGateOpen(true);
+  if (refs.feedbackBox) refs.feedbackBox.textContent = 'Αποτυχία εκκίνησης εφαρμογής.';
 });
 

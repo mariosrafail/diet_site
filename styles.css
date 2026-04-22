@@ -35,6 +35,9 @@ body.modal-open {
 body.saving {
   overflow: hidden;
 }
+body.auth-locked {
+  overflow: hidden;
+}
 .bg-orb {
   position: fixed;
   border-radius: 999px;
@@ -620,6 +623,63 @@ select optgroup {
 }
 .live-dock-totals span { display: block; color: var(--muted); font-size: 11px; line-height: 1.1; }
 .live-dock-totals strong { font-size: 13px; line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
+.live-dock-user {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.live-dock-user small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.live-dock-user #logoutBtn {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.user-gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 11, 20, 0.74);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 11000;
+  padding: 16px;
+}
+.user-gate.open {
+  display: flex;
+}
+.user-gate-card {
+  width: min(460px, 100%);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 18px;
+  background: rgba(10, 17, 32, 0.95);
+  box-shadow: 0 22px 62px rgba(0,0,0,0.52);
+  padding: 18px;
+}
+.user-gate-card h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+.user-gate-card p {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+.user-gate-form {
+  display: grid;
+  gap: 10px;
+}
+.user-gate-form .btn {
+  margin-top: 0;
+}
+.user-gate-error {
+  display: block;
+  margin-top: 10px;
+  color: #fecaca;
+}
 .grocery-grid { grid-template-columns: repeat(4, 1fr); }
 .grocery-card h3 { margin-top: 0; font-size: 18px; }
 .price { font-size: 28px; font-weight: 800; margin: 8px 0; color: var(--accent); }
@@ -656,6 +716,9 @@ select optgroup {
   }
   .live-dock-totals span { font-size: 10px; }
   .live-dock-totals strong { font-size: 12px; }
+  .live-dock-user {
+    margin-top: 6px;
+  }
   .food-row.row-locked { grid-template-columns: 1fr; }
   .food-row.row-locked .row-actions { justify-self: start; }
   .save-changes-btn {
