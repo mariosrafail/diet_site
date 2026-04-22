@@ -786,7 +786,7 @@ function collectDashboardPayload() {
 }
 
 async function saveDashboardChanges(silent = false) {
-  beginSaving();
+  beginSaving('Αποθήκευση...');
   try {
   const payload = collectDashboardPayload();
   const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/dashboard`, {
@@ -938,23 +938,28 @@ document.addEventListener('click', e => {
 
 async function initApp() {
   saveOverlay = document.getElementById('savingOverlay');
+  saveOverlayLabel = document.getElementById('savingOverlayLabel');
   setupImageModal();
   setupAlternativeDropdowns();
+  beginSaving('Φόρτωση δεδομένων...');
+  try {
+    foodDb = await fetchFoodsFromApi();
+    getEditableRows().forEach(row => prepareRow(row, true));
+    refreshDbSelectOptions();
+    setupMealButtons();
 
-  foodDb = await fetchFoodsFromApi();
-  getEditableRows().forEach(row => prepareRow(row, true));
-  refreshDbSelectOptions();
-  setupMealButtons();
+    await loadDashboard();
 
-  await loadDashboard();
-
-  updateFoodImages();
-  applyTargets({ persistRemote: false });
-  setHasUnsavedChanges(false);
+    updateFoodImages();
+    await applyTargets({ persistRemote: false });
+    setHasUnsavedChanges(false);
+  } finally {
+    endSaving();
+  }
 }
 
 initApp().catch(error => {
   console.error('Init failed:', error);
-  applyTargets({ persistRemote: false });
+  applyTargets({ persistRemote: false }).catch(() => {});
 });
 

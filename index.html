@@ -288,7 +288,10 @@
   </section>
 
   <div id="savingOverlay" class="saving-overlay" aria-hidden="true">
-    <div class="saving-spinner" aria-label="Saving"></div>
+    <div class="saving-overlay-card" role="status" aria-live="polite" aria-atomic="true">
+      <div class="saving-spinner" aria-label="Loading"></div>
+      <p id="savingOverlayLabel" class="saving-overlay-label">Φόρτωση...</p>
+    </div>
   </div>
 
   <script src="app.js"></script>
