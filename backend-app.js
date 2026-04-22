@@ -163,15 +163,7 @@ async function ensureSchema() {
           `INSERT INTO foods (name, food_key, unit, cal, protein, carbs, fat, image_path)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            ON CONFLICT (food_key)
-           DO UPDATE SET
-             name = EXCLUDED.name,
-             unit = EXCLUDED.unit,
-             cal = EXCLUDED.cal,
-             protein = EXCLUDED.protein,
-             carbs = EXCLUDED.carbs,
-             fat = EXCLUDED.fat,
-             image_path = EXCLUDED.image_path,
-             updated_at = NOW()`,
+           DO NOTHING`,
           [food.name, key, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
         );
       }
@@ -180,21 +172,19 @@ async function ensureSchema() {
         `INSERT INTO users (slug, full_name)
          VALUES ($1, $2)
          ON CONFLICT (slug)
-         DO UPDATE SET full_name = EXCLUDED.full_name
+         DO NOTHING
          RETURNING id`,
         [DEFAULT_USER.slug, DEFAULT_USER.full_name]
       );
-      const userId = userResult.rows[0].id;
+      const userId = userResult.rows[0]?.id
+        || (await pool.query('SELECT id FROM users WHERE slug = $1', [DEFAULT_USER.slug])).rows[0]?.id;
+      if (!userId) throw new Error('failed_to_resolve_default_user');
 
       await pool.query(
         `INSERT INTO user_targets (user_id, calorie_target, protein_multiplier, weight)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (user_id)
-         DO UPDATE SET
-           calorie_target = EXCLUDED.calorie_target,
-           protein_multiplier = EXCLUDED.protein_multiplier,
-           weight = EXCLUDED.weight,
-           updated_at = NOW()`,
+         DO NOTHING`,
         [userId, DEFAULT_USER.calorieTarget, DEFAULT_USER.proteinMultiplier, DEFAULT_USER.weight]
       );
 
@@ -203,10 +193,7 @@ async function ensureSchema() {
           `INSERT INTO user_meals (user_id, meal_key, title, description, sort_order)
            VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (user_id, meal_key)
-           DO UPDATE SET
-             title = EXCLUDED.title,
-             description = EXCLUDED.description,
-             sort_order = EXCLUDED.sort_order`,
+           DO NOTHING`,
           [userId, meal.meal_key, meal.title, meal.description, meal.sort_order]
         );
       }
@@ -220,10 +207,7 @@ async function ensureSchema() {
           `INSERT INTO user_meal_items (meal_id, row_key, food_id, qty)
            VALUES ($1, $2, $3, $4)
            ON CONFLICT (meal_id, row_key)
-           DO UPDATE SET
-             food_id = EXCLUDED.food_id,
-             qty = EXCLUDED.qty,
-             updated_at = NOW()`,
+           DO NOTHING`,
           [mealRes.rows[0].id, item.row_key, foodRes.rows[0].id, item.qty]
         );
       }

@@ -27,7 +27,6 @@ const dockRefs = {
   totalFat: document.getElementById('totalFatDock')
 };
 
-const TARGETS_STORAGE_KEY = 'dietSiteTargetsV1';
 const FOODS_API_ENDPOINT = '/api/foods';
 const USER_SLUG = 'konstantinos';
 
@@ -38,6 +37,7 @@ let customMealCounter = 0;
 let altCounter = 0;
 let hasUnsavedChanges = false;
 let saveOverlay = null;
+let saveOverlayLabel = null;
 let pendingSaveCount = 0;
 
 function setHasUnsavedChanges(value) {
@@ -50,9 +50,10 @@ function markUnsavedChanges() {
   setHasUnsavedChanges(true);
 }
 
-function beginSaving() {
+function beginSaving(label = 'Φόρτωση...') {
   pendingSaveCount += 1;
   if (!saveOverlay) return;
+  if (saveOverlayLabel) saveOverlayLabel.textContent = label;
   saveOverlay.classList.add('open');
   saveOverlay.setAttribute('aria-hidden', 'false');
   document.body.classList.add('saving');
@@ -252,42 +253,22 @@ function updateUI() {
   updateMealCalories();
 }
 
-function saveTargetsLocal() {
-  const payload = {
-    calorieTarget: Number(refs.calorieTargetInput?.value || targets.calories),
-    weight: Number(refs.weightInput?.value || 93),
-    proteinMultiplier: Number(refs.proteinMultiplier?.value || 1.7)
-  };
-  localStorage.setItem(TARGETS_STORAGE_KEY, JSON.stringify(payload));
-}
-
-function loadTargetsLocal() {
-  const raw = localStorage.getItem(TARGETS_STORAGE_KEY);
-  if (!raw) return;
-  try {
-    const saved = JSON.parse(raw);
-    if (Number.isFinite(saved.calorieTarget)) refs.calorieTargetInput.value = String(saved.calorieTarget);
-    if (Number.isFinite(saved.weight)) refs.weightInput.value = String(saved.weight);
-    if (Number.isFinite(saved.proteinMultiplier)) refs.proteinMultiplier.value = String(saved.proteinMultiplier);
-  } catch {
-    localStorage.removeItem(TARGETS_STORAGE_KEY);
-  }
-}
-
 async function saveTargetsRemote() {
-  await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/targets`, {
+  const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/targets`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      calorieTarget: Number(refs.calorieTargetInput.value || 2500),
+      calorieTarget: Number(refs.calorieTargetInput.value || targets.calories),
       proteinMultiplier: Number(refs.proteinMultiplier.value || 1.7),
       weight: Number(refs.weightInput.value || 93)
     })
   });
+  if (!response.ok) throw new Error('targets_write_failed');
 }
 
-function applyTargets() {
-  const calories = Number(refs.calorieTargetInput.value || 2500);
+async function applyTargets(options = {}) {
+  const { persistRemote = true } = options;
+  const calories = Number(refs.calorieTargetInput.value || targets.calories);
   const weight = Number(refs.weightInput.value || 93);
   const multiplier = Number(refs.proteinMultiplier.value || 1.7);
 
@@ -297,8 +278,16 @@ function applyTargets() {
   refs.goalCalories.textContent = `${targets.calories} kcal`;
   refs.goalProtein.textContent = `${targets.protein} g`;
 
-  saveTargetsLocal();
-  saveTargetsRemote().catch(error => console.error('Failed to save targets:', error));
+  if (persistRemote) {
+    beginSaving('Αποθήκευση στόχων...');
+    try {
+      await saveTargetsRemote();
+    } catch (error) {
+      console.error('Failed to save targets:', error);
+    } finally {
+      endSaving();
+    }
+  }
   updateUI();
 }
 
@@ -467,13 +456,14 @@ async function saveRowForUser(row, foodId) {
   const mealTitle = mealCard.querySelector('.meal-top h3')?.textContent?.trim() || mealKey;
   const qty = Number(row.querySelector('.qty-box input')?.value || 0);
 
-  beginSaving();
+  beginSaving('Αποθήκευση...');
   try {
-    await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/meal-items`, {
+    const response = await fetch(`/api/users/${encodeURIComponent(USER_SLUG)}/meal-items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mealKey, rowKey: row.dataset.rowKey, foodId, qty, mealTitle })
     });
+    if (!response.ok) throw new Error('meal_item_write_failed');
   } finally {
     endSaving();
   }
@@ -738,9 +728,12 @@ function setupImageModal() {
 
 function applyDashboardTargets(targetsData) {
   if (!targetsData) return;
-  refs.calorieTargetInput.value = String(targetsData.calorieTarget || refs.calorieTargetInput.value);
-  refs.proteinMultiplier.value = String(targetsData.proteinMultiplier || refs.proteinMultiplier.value);
-  refs.weightInput.value = String(targetsData.weight || refs.weightInput.value);
+  const calorieTarget = Number(targetsData.calorieTarget);
+  const proteinMultiplier = Number(targetsData.proteinMultiplier);
+  const weight = Number(targetsData.weight);
+  if (Number.isFinite(calorieTarget)) refs.calorieTargetInput.value = String(calorieTarget);
+  if (Number.isFinite(proteinMultiplier)) refs.proteinMultiplier.value = String(proteinMultiplier);
+  if (Number.isFinite(weight)) refs.weightInput.value = String(weight);
 }
 
 function findOrCreateMealCard(meal) {
@@ -946,7 +939,6 @@ document.addEventListener('click', e => {
 async function initApp() {
   saveOverlay = document.getElementById('savingOverlay');
   setupImageModal();
-  loadTargetsLocal();
   setupAlternativeDropdowns();
 
   foodDb = await fetchFoodsFromApi();
@@ -957,12 +949,12 @@ async function initApp() {
   await loadDashboard();
 
   updateFoodImages();
-  applyTargets();
+  applyTargets({ persistRemote: false });
   setHasUnsavedChanges(false);
 }
 
 initApp().catch(error => {
   console.error('Init failed:', error);
-  applyTargets();
+  applyTargets({ persistRemote: false });
 });
 

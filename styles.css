@@ -59,6 +59,19 @@ body.saving {
   grid-template-columns: 1.6fr 0.9fr;
   gap: 20px;
 }
+.hero-brand {
+  display: inline-flex;
+  margin-bottom: 14px;
+}
+.hero-brand img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  padding: 6px;
+}
 .eyebrow {
   margin: 0 0 8px;
   color: var(--accent);
@@ -445,6 +458,7 @@ select optgroup {
 }
 @media (max-width: 640px) {
   .hero, .panel { padding: 18px; border-radius: 22px; }
+  .hero-brand img { width: 48px; height: 48px; border-radius: 12px; }
   .metric-grid, .grocery-grid, .totals-grid, .sweet-grid, .controls-grid, .macro-targets { grid-template-columns: 1fr; }
   .stat-card strong, .metric-box strong, .total-box strong { font-size: 24px; }
   .meal-top { flex-direction: column; }
