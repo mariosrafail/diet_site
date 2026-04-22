@@ -9,18 +9,34 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="admin-page">
   <div class="bg-orb orb-1"></div>
   <div class="bg-orb orb-2"></div>
 
-  <main class="layout">
+  <main class="layout admin-layout">
     <section class="panel glass food-db-panel">
       <div class="section-head">
         <h2>Admin Βάση Τροφίμων</h2>
         <p>Μόνο εδώ προσθέτεις/ενημερώνεις τρόφιμα, macros και εικόνα.</p>
       </div>
+
       <div class="food-db-grid">
         <div class="food-db-table-wrap">
+          <div class="food-db-table-tools">
+            <label>
+              <span>Φίλτρο κατηγορίας</span>
+              <select id="foodCategoryFilter">
+                <option value="all" selected>Όλες οι κατηγορίες</option>
+                <option value="vegetables">Λαχανικά</option>
+                <option value="fruit">Φρούτα (υδατάνθρακας)</option>
+                <option value="protein">Πηγή πρωτεΐνης</option>
+                <option value="carb">Πηγή υδατάνθρακα</option>
+                <option value="fat">Πηγή λιπαρών</option>
+                <option value="water">Νερό</option>
+              </select>
+            </label>
+          </div>
+
           <table class="food-db-table">
             <thead>
               <tr>
@@ -41,7 +57,12 @@
 
         <div class="food-db-form">
           <h3>Προσθήκη / Ενημέρωση</h3>
-          <label><span>Όνομα</span><input id="dbNameInput" type="text" placeholder="π.χ. Γιαούρτι 2%" /></label>
+
+          <label>
+            <span>Όνομα</span>
+            <input id="dbNameInput" type="text" placeholder="π.χ. Γιαούρτι 2%" />
+          </label>
+
           <label>
             <span>Κατηγορία</span>
             <select id="dbCategoryInput">
@@ -50,8 +71,10 @@
               <option value="protein" selected>Πηγή πρωτεΐνης</option>
               <option value="carb">Πηγή υδατάνθρακα</option>
               <option value="fat">Πηγή λιπαρών</option>
+              <option value="water">Νερό</option>
             </select>
           </label>
+
           <div class="food-db-form-grid">
             <label><span>Μονάδα</span><select id="dbUnitInput"><option value="g">g</option><option value="ml">ml</option><option value="τεμ">τεμ</option></select></label>
             <label><span>kcal</span><input id="dbCalInput" type="number" min="0" step="0.1" value="100" /></label>
@@ -59,14 +82,25 @@
             <label><span>C</span><input id="dbCarbsInput" type="number" min="0" step="0.1" value="5" /></label>
             <label><span>F</span><input id="dbFatInput" type="number" min="0" step="0.1" value="3" /></label>
           </div>
-          <label>
-            <span>Εικόνα</span>
-            <select id="dbImageInput"></select>
-          </label>
+
+          <input id="dbImageInput" type="hidden" value="assets/food_images/placeholder.svg" />
+
+          <div class="food-upload-row">
+            <label class="food-upload-file">
+              <span>Upload από υπολογιστή</span>
+              <input id="dbImageFileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.svg,.avif,.gif,image/*" />
+            </label>
+            <button class="mini-btn" id="uploadFoodImageBtn" type="button">Upload εικόνας</button>
+          </div>
+
+          <small id="currentImagePath" class="mini-note"></small>
+          <small id="uploadFoodImageStatus" class="mini-note"></small>
+
           <div id="imagePreviewWrap" class="food-label-wrap">
             <img id="imagePreview" class="food-thumb" alt="Preview" />
             <small id="imagePreviewText"></small>
           </div>
+
           <button class="btn btn-secondary" id="saveFoodDbBtn" type="button">Αποθήκευση τροφίμου</button>
         </div>
       </div>

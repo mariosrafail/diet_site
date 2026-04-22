@@ -17,7 +17,36 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-const FOOD_CATEGORY_VALUES = ['vegetables', 'fruit', 'protein', 'carb', 'fat'];
+const FOOD_CATEGORY_VALUES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
+const FRUIT_KEYWORDS = [
+  'μηλο', 'μήλο', 'apple',
+  'μπανανα', 'μπανάνα', 'banana',
+  'πορτοκαλι', 'πορτοκάλι', 'orange',
+  'μανταρινι', 'μανταρίνι', 'mandarin',
+  'αχλαδι', 'αχλάδι', 'pear',
+  'ροδακινο', 'ροδάκινο', 'peach',
+  'νεκταρινι', 'νεκταρίνι', 'nectarine',
+  'βερικοκο', 'βερίκοκο', 'apricot',
+  'κερασι', 'κεράσι', 'cherry',
+  'σταφυλι', 'σταφύλι', 'grape',
+  'ακτινιδιο', 'ακτινίδιο', 'kiwi',
+  'φραουλα', 'φράουλα', 'strawberry',
+  'βατομουρ', 'raspberry',
+  'blueberry', 'cranberry',
+  'καρπουζι', 'καρπούζι', 'watermelon',
+  'πεπονι', 'πεπόνι', 'melon',
+  'ανανας', 'ανανάς', 'pineapple',
+  'mango', 'μανγκο', 'μάνγκο',
+  'papaya', 'παπαγια', 'παπάγια',
+  'ροδι', 'ρόδι', 'pomegranate',
+  'δαμασκηνο', 'δαμάσκηνο', 'plum',
+  'συκο', 'σύκο', 'fig',
+  'χουρμα', 'χουρμά', 'date',
+  'λεμονι', 'λεμόνι', 'lemon',
+  'lime', 'limes',
+  'γκρειπφρουτ', 'grapefruit'
+];
+const WATER_KEYWORDS = ['νερο', 'νερό', 'water'];
 
 const DEFAULT_FOOD_DB = [
   { name: 'Αυγά αχυρώνα ΜΑΡΑΤΑ μεσαία', unit: 'τεμ', cal: 82.5, protein: 7.2, carbs: 0.6, fat: 6.1, image_path: 'assets/food_images/auga.jpg' },
@@ -100,6 +129,7 @@ function normalizeFoodCategory(raw) {
   if (value === 'protein' || value === 'proteins' || value === 'πρωτεινη' || value === 'πρωτεΐνη') return 'protein';
   if (value === 'carb' || value === 'carbs' || value === 'carbohydrate' || value === 'υδατανθρακας' || value === 'υδατανθράκας' || value === 'υδατανθρακες' || value === 'υδατάνθρακες') return 'carb';
   if (value === 'fat' || value === 'fats' || value === 'λιπαρα' || value === 'λιπαρά') return 'fat';
+  if (value === 'water' || value === 'νερο' || value === 'νερό') return 'water';
 
   return 'protein';
 }
@@ -118,13 +148,43 @@ function normalizeFood(input) {
   };
 }
 
+function normalizeUploadBaseName(raw) {
+  const base = String(raw || '')
+    .replace(/\.[^.]+$/, '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || 'food-image';
+}
 
-async function listFoodImageFiles() {
-  const allowedExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif', '.gif']);
-  const candidates = [
+function getUploadTargetDirCandidates() {
+  return [
     path.join(process.cwd(), 'assets', 'food_images'),
     path.join(__dirname, 'assets', 'food_images')
   ];
+}
+
+async function resolveWritableFoodImagesDir() {
+  const candidates = getUploadTargetDirCandidates();
+  for (const dirPath of candidates) {
+    try {
+      await fs.mkdir(dirPath, { recursive: true });
+      await fs.access(dirPath);
+      return dirPath;
+    } catch {
+      // Try next candidate path.
+    }
+  }
+  throw new Error('food_images_dir_unavailable');
+}
+
+
+async function listFoodImageFiles() {
+  const allowedExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif', '.gif']);
+  const candidates = getUploadTargetDirCandidates();
 
   for (const dirPath of candidates) {
     try {
@@ -153,7 +213,7 @@ async function ensureSchema() {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name TEXT NOT NULL,
           food_key TEXT NOT NULL UNIQUE,
-          category TEXT NOT NULL DEFAULT 'protein' CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat')),
+          category TEXT NOT NULL DEFAULT 'protein' CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat', 'water')),
           unit TEXT NOT NULL CHECK (unit IN ('g', 'ml', 'τεμ')),
           cal DOUBLE PRECISION NOT NULL CHECK (cal >= 0),
           protein DOUBLE PRECISION NOT NULL CHECK (protein >= 0),
@@ -218,17 +278,24 @@ async function ensureSchema() {
       await pool.query(`ALTER TABLE foods ALTER COLUMN category SET NOT NULL`);
       await pool.query(`
         DO $$
+        DECLARE r RECORD;
         BEGIN
-          IF NOT EXISTS (
-            SELECT 1
-            FROM pg_constraint
-            WHERE conname = 'foods_category_check'
-          ) THEN
-            ALTER TABLE foods
-            ADD CONSTRAINT foods_category_check
-            CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat'));
-          END IF;
+          FOR r IN
+            SELECT c.conname
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            WHERE t.relname = 'foods'
+              AND c.contype = 'c'
+              AND pg_get_constraintdef(c.oid) ILIKE '%category%'
+          LOOP
+            EXECUTE format('ALTER TABLE foods DROP CONSTRAINT IF EXISTS %I', r.conname);
+          END LOOP;
         END $$;
+      `);
+      await pool.query(`
+        ALTER TABLE foods
+        ADD CONSTRAINT foods_category_check
+        CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'))
       `);
       await pool.query(
         `UPDATE foods
@@ -245,6 +312,31 @@ async function ensureSchema() {
            'assets/food_images/ladi.jpg',
            'assets/food_images/kshroi.jpg'
          )`
+      );
+      await pool.query(
+        `UPDATE foods
+         SET category = 'fruit'
+         WHERE category <> 'fruit'
+           AND EXISTS (
+             SELECT 1
+             FROM unnest($1::text[]) AS kw
+             WHERE LOWER(name) LIKE '%' || kw || '%'
+           )`,
+        [FRUIT_KEYWORDS.map(keyword => String(keyword).toLowerCase())]
+      );
+      await pool.query(
+        `UPDATE foods
+         SET category = 'water'
+         WHERE category <> 'water'
+           AND EXISTS (
+             SELECT 1
+             FROM unnest($1::text[]) AS kw
+             WHERE LOWER(name) = kw
+                OR LOWER(name) LIKE kw || ' %'
+                OR LOWER(name) LIKE '% ' || kw
+                OR LOWER(name) LIKE '% ' || kw || ' %'
+           )`,
+        [WATER_KEYWORDS.map(keyword => String(keyword).toLowerCase())]
       );
 
       if (BOOTSTRAP_DEFAULT_DATA) {
@@ -327,7 +419,7 @@ async function ensureSchema() {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '12mb' }));
 app.use('/api', (_req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
@@ -411,6 +503,46 @@ app.get('/api/food-images', async (_req, res) => {
     res.json(Array.from(merged).sort((a, b) => a.localeCompare(b, 'el')));
   } catch {
     res.status(500).json({ error: 'images_read_failed' });
+  }
+});
+
+app.post('/api/food-images/upload', async (req, res) => {
+  const rawName = String(req.body?.fileName || '').trim();
+  const contentBase64 = String(req.body?.contentBase64 || '').trim();
+  const ext = path.extname(rawName).toLowerCase();
+  const allowedExt = new Set(['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif', '.gif']);
+
+  if (!rawName || !contentBase64) {
+    res.status(400).json({ error: 'fileName_contentBase64_required' });
+    return;
+  }
+  if (!allowedExt.has(ext)) {
+    res.status(400).json({ error: 'invalid_file_type' });
+    return;
+  }
+
+  try {
+    const buffer = Buffer.from(contentBase64, 'base64');
+    if (!buffer.length) {
+      res.status(400).json({ error: 'empty_file' });
+      return;
+    }
+    if (buffer.length > 8 * 1024 * 1024) {
+      res.status(413).json({ error: 'file_too_large' });
+      return;
+    }
+
+    const dirPath = await resolveWritableFoodImagesDir();
+    const base = normalizeUploadBaseName(rawName);
+    const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const fileName = `${base}-${uniqueSuffix}${ext}`;
+    const absolutePath = path.join(dirPath, fileName);
+
+    await fs.writeFile(absolutePath, buffer);
+
+    res.json({ path: `assets/food_images/${fileName}` });
+  } catch {
+    res.status(500).json({ error: 'upload_failed' });
   }
 });
 

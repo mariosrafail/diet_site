@@ -1,17 +1,18 @@
 const FOODS_API_ENDPOINT = '/api/foods';
-const FOOD_IMAGES_API_ENDPOINT = '/api/food-images';
-const FOOD_IMAGES_CATALOG_ENDPOINT = '/assets/food_images/catalog.json';
-const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat'];
+const FOOD_IMAGE_UPLOAD_API_ENDPOINT = '/api/food-images/upload';
+const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
 const FOOD_CATEGORY_LABELS = {
   vegetables: 'Λαχανικά',
   fruit: 'Φρούτα (υδατάνθρακας)',
   protein: 'Πηγή πρωτεΐνης',
   carb: 'Πηγή υδατάνθρακα',
-  fat: 'Πηγή λιπαρών'
+  fat: 'Πηγή λιπαρών',
+  water: 'Νερό'
 };
 
 const refs = {
   foodDbTable: document.getElementById('foodDbTable'),
+  foodCategoryFilter: document.getElementById('foodCategoryFilter'),
   dbNameInput: document.getElementById('dbNameInput'),
   dbCategoryInput: document.getElementById('dbCategoryInput'),
   dbUnitInput: document.getElementById('dbUnitInput'),
@@ -20,13 +21,17 @@ const refs = {
   dbCarbsInput: document.getElementById('dbCarbsInput'),
   dbFatInput: document.getElementById('dbFatInput'),
   dbImageInput: document.getElementById('dbImageInput'),
+  dbImageFileInput: document.getElementById('dbImageFileInput'),
+  uploadFoodImageBtn: document.getElementById('uploadFoodImageBtn'),
+  currentImagePath: document.getElementById('currentImagePath'),
+  uploadFoodImageStatus: document.getElementById('uploadFoodImageStatus'),
   imagePreview: document.getElementById('imagePreview'),
   imagePreviewText: document.getElementById('imagePreviewText'),
   saveFoodDbBtn: document.getElementById('saveFoodDbBtn')
 };
 
 let foods = [];
-let imageOptions = [];
+let activeCategoryFilter = 'all';
 
 function round(value) {
   return Math.round(value * 10) / 10;
@@ -56,41 +61,58 @@ async function fetchFoods() {
   foods = Array.isArray(data) ? data.map(normalizeFoodEntry) : [];
 }
 
-async function fetchImageOptions() {
-  const [apiResult, catalogResult] = await Promise.allSettled([
-    fetch(FOOD_IMAGES_API_ENDPOINT, { cache: 'no-store' }).then(res => (res.ok ? res.json() : [])),
-    fetch(FOOD_IMAGES_CATALOG_ENDPOINT, { cache: 'no-store' }).then(res => (res.ok ? res.json() : []))
-  ]);
-
-  const apiPaths = apiResult.status === 'fulfilled' && Array.isArray(apiResult.value) ? apiResult.value : [];
-  const catalogPaths = catalogResult.status === 'fulfilled' && Array.isArray(catalogResult.value) ? catalogResult.value : [];
-
-  imageOptions = Array.from(
-    new Set([...apiPaths, ...catalogPaths].map(path => String(path || '').trim()).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b, 'el'));
-}
-
-function renderImageSelect() {
-  refs.dbImageInput.innerHTML = '';
-  imageOptions.forEach(path => {
-    const option = document.createElement('option');
-    option.value = path;
-    option.textContent = path.replace('assets/food_images/', '');
-    refs.dbImageInput.appendChild(option);
-  });
-  if (!imageOptions.length) {
-    const option = document.createElement('option');
-    option.value = 'assets/food_images/placeholder.svg';
-    option.textContent = 'placeholder.svg';
-    refs.dbImageInput.appendChild(option);
-  }
-  updateImagePreview();
-}
-
 function updateImagePreview() {
   const path = refs.dbImageInput.value || 'assets/food_images/placeholder.svg';
   refs.imagePreview.src = path;
   refs.imagePreviewText.textContent = path;
+  if (refs.currentImagePath) refs.currentImagePath.textContent = `Τρέχουσα εικόνα: ${path}`;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : '';
+      if (!base64) reject(new Error('base64_parse_failed'));
+      else resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('file_read_failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadSelectedImage() {
+  const file = refs.dbImageFileInput.files?.[0];
+  if (!file) {
+    refs.uploadFoodImageStatus.textContent = 'Διάλεξε πρώτα αρχείο εικόνας.';
+    return;
+  }
+
+  refs.uploadFoodImageStatus.textContent = 'Γίνεται upload...';
+  refs.uploadFoodImageBtn.disabled = true;
+
+  try {
+    const contentBase64 = await fileToBase64(file);
+    const res = await fetch(FOOD_IMAGE_UPLOAD_API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, contentBase64 })
+    });
+    if (!res.ok) throw new Error('upload_failed');
+
+    const data = await res.json();
+    await reloadData();
+    if (data?.path) refs.dbImageInput.value = data.path;
+    updateImagePreview();
+    refs.uploadFoodImageStatus.textContent = 'Η εικόνα ανέβηκε επιτυχώς.';
+    refs.dbImageFileInput.value = '';
+  } catch (error) {
+    console.error(error);
+    refs.uploadFoodImageStatus.textContent = 'Αποτυχία upload. Δοκίμασε ξανά.';
+  } finally {
+    refs.uploadFoodImageBtn.disabled = false;
+  }
 }
 
 function fillForm(food) {
@@ -107,13 +129,17 @@ function fillForm(food) {
 
 function renderFoodsTable() {
   refs.foodDbTable.innerHTML = '';
-  foods
+
+  const visibleFoods = foods
+    .filter(food => activeCategoryFilter === 'all' || food.category === activeCategoryFilter)
     .slice()
     .sort((a, b) => {
       const byCategory = (FOOD_CATEGORIES.indexOf(a.category) - FOOD_CATEGORIES.indexOf(b.category));
       if (byCategory !== 0) return byCategory;
       return a.name.localeCompare(b.name, 'el');
-    })
+    });
+
+  visibleFoods
     .forEach(food => {
       const tr = document.createElement('tr');
 
@@ -189,12 +215,17 @@ async function saveFood() {
 }
 
 async function reloadData() {
-  await Promise.all([fetchFoods(), fetchImageOptions()]);
-  renderImageSelect();
+  await fetchFoods();
   renderFoodsTable();
 }
 
-refs.dbImageInput.addEventListener('change', updateImagePreview);
+refs.uploadFoodImageBtn.addEventListener('click', () => {
+  uploadSelectedImage().catch(error => console.error(error));
+});
+refs.foodCategoryFilter.addEventListener('change', () => {
+  activeCategoryFilter = refs.foodCategoryFilter.value || 'all';
+  renderFoodsTable();
+});
 refs.saveFoodDbBtn.addEventListener('click', async () => {
   try {
     await saveFood();
@@ -204,4 +235,5 @@ refs.saveFoodDbBtn.addEventListener('click', async () => {
   }
 });
 
+updateImagePreview();
 reloadData().catch(error => console.error(error));

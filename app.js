@@ -30,20 +30,20 @@ const dockRefs = {
 
 const FOODS_API_ENDPOINT = '/api/foods';
 const USER_SLUG = 'konstantinos';
-const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat'];
+const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat', 'water'];
 const FOOD_CATEGORY_LABELS = {
   vegetables: 'Λαχανικά',
   fruit: 'Φρούτα (υδατάνθρακας)',
   protein: 'Πηγή πρωτεΐνης',
   carb: 'Πηγή υδατάνθρακα',
-  fat: 'Πηγή λιπαρών'
+  fat: 'Πηγή λιπαρών',
+  water: 'Νερό'
 };
 
 let targets = { calories: 2500, protein: 160, carbs: 255, fat: 80 };
 let foodDb = [];
 let imageModal = null;
 let customMealCounter = 0;
-let altCounter = 0;
 let hasUnsavedChanges = false;
 let saveOverlay = null;
 let saveOverlayLabel = null;
@@ -190,6 +190,23 @@ function classifyPrepType(labelText) {
   return null;
 }
 
+function getCookedWeightProfile(labelText) {
+  const key = toFoodKey(labelText || '');
+  const hasCookedWord = key.includes(toFoodKey('ψητ')) || key.includes(toFoodKey('βρασ'));
+  if (!hasCookedWord) return null;
+
+  if (key.includes(toFoodKey('κοτοπουλ'))) {
+    return { rawPerCooked: 1.33, cookedLabel: 'ψημένο', rawLabel: 'ωμό' };
+  }
+  if (key.includes(toFoodKey('κιμα'))) {
+    return { rawPerCooked: 1.3, cookedLabel: 'μαγειρεμένο', rawLabel: 'ωμό' };
+  }
+  if (key.includes(toFoodKey('πατατ'))) {
+    return { rawPerCooked: 1.2, cookedLabel: 'μαγειρεμένη', rawLabel: 'ωμή' };
+  }
+  return null;
+}
+
 function formatNumber(value) {
   return Number.isInteger(value) ? String(value) : String(round(value));
 }
@@ -206,10 +223,37 @@ function ensurePrepNote(row) {
   return note;
 }
 
+function ensureRawHint(row) {
+  const qtyBox = row?.querySelector('.qty-box');
+  if (!qtyBox) return null;
+  let hint = qtyBox.querySelector('.raw-hint');
+  if (!hint) {
+    hint = document.createElement('small');
+    hint.className = 'raw-hint';
+    qtyBox.appendChild(hint);
+  }
+  return hint;
+}
+
 function updatePrepNoteForRow(row) {
   const labelText = row?.querySelector('.food-main label')?.textContent || '';
   const prepType = classifyPrepType(labelText);
+  const cookedProfile = getCookedWeightProfile(labelText);
   const existing = row?.querySelector('.prep-note');
+  const rawHint = ensureRawHint(row);
+  if (rawHint) rawHint.textContent = '';
+
+  if (cookedProfile) {
+    const qty = Number(row.querySelector('.qty-box input')?.value || 0);
+    const rawQty = round(qty * cookedProfile.rawPerCooked);
+    if (rawHint) rawHint.textContent = `(≈ ${formatNumber(rawQty)} g ${cookedProfile.rawLabel})`;
+
+    const note = ensurePrepNote(row);
+    if (!note) return;
+    note.textContent = `Υπολογισμός σε μαγειρεμένο βάρος (${cookedProfile.cookedLabel}).`;
+    return;
+  }
+
   if (!prepType) {
     if (existing) existing.remove();
     return;
@@ -387,6 +431,7 @@ function refreshDbSelectOptions() {
 
     if (selected && foodDb.some(item => item.id === selected)) select.value = selected;
   });
+  renderAlternativeMenus();
 }
 
 function ensureDbPickerForRow(row) {
@@ -411,6 +456,94 @@ function getFoodIdFromRow(row) {
   return byName?.id || null;
 }
 
+function closeAlternativeMenus(exceptRow = null) {
+  document.querySelectorAll('.food-alt-wrap.open').forEach(wrap => {
+    const row = wrap.closest('.food-row');
+    if (exceptRow && row === exceptRow) return;
+    wrap.classList.remove('open');
+  });
+}
+
+function getRowCalories(row) {
+  const qty = Number(row?.querySelector('.qty-box input')?.value || 0);
+  const unit = normalizeUnit(row?.querySelector('.qty-box span')?.textContent || 'g');
+  const caloriesPerUnit = Number(row?.dataset.cal || 0);
+  const factor = unit === 'τεμ' ? qty : qty / 100;
+  return caloriesPerUnit * factor;
+}
+
+function getEquivalentQtyForFoodByCalories(calories, food) {
+  if (!food || !Number.isFinite(calories) || calories <= 0 || food.cal <= 0) return 0;
+  if (food.unit === 'τεμ') return round(calories / food.cal);
+  return round((calories / food.cal) * 100);
+}
+
+function renderAlternativeMenuForRow(row) {
+  const wrap = row?.querySelector('.food-alt-wrap');
+  const select = wrap?.querySelector('.alt-select');
+  const applyBtn = wrap?.querySelector('.alt-apply-btn');
+  if (!wrap || !select || !applyBtn) return;
+
+  const isLocked = row.dataset.locked === '1';
+  const currentFoodId = getFoodIdFromRow(row);
+  const currentFood = currentFoodId ? getFoodById(currentFoodId) : null;
+
+  if (!isLocked || !currentFood) {
+    wrap.hidden = true;
+    wrap.classList.remove('open');
+    return;
+  }
+
+  const alternatives = foodDb
+    .filter(food => food.id !== currentFood.id && food.category === currentFood.category)
+    .sort((a, b) => a.name.localeCompare(b.name, 'el'));
+
+  if (!alternatives.length) {
+    wrap.hidden = true;
+    wrap.classList.remove('open');
+    return;
+  }
+
+  wrap.hidden = false;
+  select.innerHTML = '<option value="">Επίλεξε εναλλακτική</option>';
+  alternatives.forEach(food => {
+    const option = document.createElement('option');
+    option.value = food.id;
+    option.textContent = `${food.name} (${round(food.cal)} kcal/${food.unit === 'τεμ' ? 'τεμ' : `100 ${food.unit}`})`;
+    select.appendChild(option);
+  });
+  applyBtn.disabled = !select.value;
+}
+
+function renderAlternativeMenus() {
+  document.querySelectorAll('.food-row.editable').forEach(renderAlternativeMenuForRow);
+}
+
+function applyAlternativeFoodSelection(row) {
+  const wrap = row?.querySelector('.food-alt-wrap');
+  const select = wrap?.querySelector('.alt-select');
+  if (!row || !select?.value) return;
+
+  const alternativeFood = getFoodById(select.value);
+  if (!alternativeFood) return;
+
+  const targetCalories = getRowCalories(row);
+  applyFoodEntryToRow(row, alternativeFood);
+
+  const qtyInput = row.querySelector('.qty-box input');
+  const equivalentQty = getEquivalentQtyForFoodByCalories(targetCalories, alternativeFood);
+  if (qtyInput && equivalentQty > 0) qtyInput.value = String(equivalentQty);
+
+  const dbSelect = row.querySelector('.db-select');
+  if (dbSelect) dbSelect.value = alternativeFood.id;
+
+  saveRowForUser(row, alternativeFood.id).catch(error => console.error('Failed to save alternative row:', error));
+  markUnsavedChanges();
+  renderAlternativeMenuForRow(row);
+  closeAlternativeMenus();
+  updateUI();
+}
+
 function setRowLocked(row, locked) {
   if (!row) return;
   row.dataset.locked = locked ? '1' : '0';
@@ -427,7 +560,8 @@ function setRowLocked(row, locked) {
   if (editBtn) editBtn.classList.toggle('active', !locked);
   if (saveBtn) saveBtn.hidden = locked;
 
-  if (locked) closeAlternativeLists();
+  closeAlternativeMenus();
+  renderAlternativeMenuForRow(row);
 }
 
 function ensureRowActions(row) {
@@ -471,13 +605,16 @@ function applyFoodEntryToRow(row, food) {
       else if (grams) small.textContent = `ανά 1 τεμ (${grams} g)`;
       else small.textContent = 'ανά 1 τεμ';
     } else {
-      small.textContent = `ανά 100 ${food.unit}`;
+      const cookedProfile = getCookedWeightProfile(food.name);
+      if (cookedProfile) small.textContent = `ανά 100 ${food.unit} μαγειρεμένο`;
+      else small.textContent = `ανά 100 ${food.unit}`;
     }
   }
   if (unitEl) unitEl.textContent = food.unit;
 
   ensureRowImage(row);
   updatePrepNoteForRow(row);
+  renderAlternativeMenuForRow(row);
 }
 
 async function saveRowForUser(row, foodId) {
@@ -503,111 +640,6 @@ async function saveRowForUser(row, foodId) {
   }
 }
 
-function parseQtyAndUnit(text) {
-  const match = text.match(/(\d+(?:[.,]\d+)?)\s*(ml|g|τεμάχια|τεμάχιο|τεμ\.?)/i);
-  if (!match) return null;
-  return { qty: Number(match[1].replace(',', '.')), unit: normalizeUnit(match[2]) };
-}
-
-function closeAlternativeLists(exceptWrap = null) {
-  document.querySelectorAll('.food-alt-wrap.open').forEach(wrap => {
-    if (wrap === exceptWrap) return;
-    const toggle = wrap.querySelector('.alt-toggle');
-    const symbol = wrap.querySelector('.alt-symbol');
-    wrap.classList.remove('open');
-    if (toggle) toggle.setAttribute('aria-expanded', 'false');
-    if (symbol) symbol.textContent = '+';
-  });
-}
-
-function applyAlternative(row, optionText) {
-  if (row?.dataset.locked === '1') return;
-  const label = row.querySelector('.food-main label');
-  if (label) label.textContent = optionText;
-
-  const qtyInput = row.querySelector('.qty-box input');
-  const unitEl = row.querySelector('.qty-box span');
-  const parsed = parseQtyAndUnit(optionText);
-  if (qtyInput && parsed) {
-    qtyInput.value = parsed.qty;
-    if (unitEl) unitEl.textContent = parsed.unit;
-  }
-
-  row.dataset.imagePath = '';
-  ensureRowImage(row);
-  updatePrepNoteForRow(row);
-  updateUI();
-}
-
-function toAltOption(text) {
-  const option = document.createElement('button');
-  option.type = 'button';
-  option.className = 'alt-option';
-  option.textContent = text;
-  return option;
-}
-
-function initAlternativeWrap(wrap) {
-  if (!wrap || wrap.dataset.enhanced === '1') return;
-  const originalTitle = wrap.querySelector('.alt-title');
-  const list = wrap.querySelector('.alt-list');
-  if (!list) return;
-
-  altCounter += 1;
-  if (!list.id) list.id = `alt-row-${altCounter}`;
-
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'alt-toggle';
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-controls', list.id);
-  toggle.innerHTML = '<span>Δείτε εναλλακτικές</span><span class="alt-symbol">+</span>';
-
-  const head = document.createElement('div');
-  head.className = 'alt-wrap-head';
-  head.appendChild(toggle);
-  if (originalTitle) originalTitle.replaceWith(head);
-  else wrap.prepend(head);
-
-  const spans = Array.from(list.querySelectorAll('span'));
-  if (spans.length) {
-    const texts = spans.map(s => s.textContent?.trim()).filter(Boolean);
-    list.textContent = '';
-    texts.forEach(text => list.appendChild(toAltOption(text)));
-  }
-
-  toggle.addEventListener('click', e => {
-    e.stopPropagation();
-    const row = wrap.closest('.food-row');
-    if (row?.dataset.locked === '1') return;
-    const isOpen = wrap.classList.contains('open');
-    if (isOpen) {
-      closeAlternativeLists();
-      return;
-    }
-    closeAlternativeLists(wrap);
-    wrap.classList.add('open');
-    toggle.setAttribute('aria-expanded', 'true');
-    const symbol = toggle.querySelector('.alt-symbol');
-    if (symbol) symbol.textContent = '−';
-  });
-
-  list.addEventListener('click', e => {
-    const row = wrap.closest('.food-row');
-    if (row?.dataset.locked === '1') return;
-    const option = e.target.closest('.alt-option');
-    if (!option) return;
-    if (row) applyAlternative(row, option.textContent);
-    closeAlternativeLists();
-  });
-
-  wrap.dataset.enhanced = '1';
-}
-
-function setupAlternativeDropdowns() {
-  document.querySelectorAll('.food-alt-wrap').forEach(initAlternativeWrap);
-}
-
 function createNewFoodRow() {
   const row = document.createElement('div');
   row.className = 'food-row editable custom-food';
@@ -621,8 +653,16 @@ function createNewFoodRow() {
       <label>Επίλεξε τρόφιμο από βάση</label>
       <small>ανά 100 g</small>
     </div>
-    <div class="qty-box"><input type="number" value="100" min="0" step="10"><span>g</span></div>
-    <div class="food-alt-wrap"><span class="alt-title">Εναλλακτικές</span><div class="alt-list"></div></div>
+    <div class="qty-box"><input type="number" value="100" min="0" step="10"><span>g</span><small class="raw-hint"></small></div>
+    <div class="food-alt-wrap" hidden>
+      <button type="button" class="mini-btn alt-open-btn">Δες εναλλακτικές</button>
+      <div class="alt-menu">
+        <select class="alt-select">
+          <option value="">Επίλεξε εναλλακτική</option>
+        </select>
+        <button type="button" class="mini-btn alt-apply-btn" disabled>Εφαρμογή</button>
+      </div>
+    </div>
   `;
 
   prepareRow(row, false);
@@ -925,6 +965,29 @@ document.addEventListener('click', e => {
     return;
   }
 
+  const altOpenBtn = e.target.closest('.alt-open-btn');
+  if (altOpenBtn) {
+    const row = altOpenBtn.closest('.food-row');
+    const wrap = row?.querySelector('.food-alt-wrap');
+    if (!row || !wrap || wrap.hidden) return;
+    const isOpen = wrap.classList.contains('open');
+    if (isOpen) wrap.classList.remove('open');
+    else {
+      renderAlternativeMenuForRow(row);
+      closeAlternativeMenus(row);
+      wrap.classList.add('open');
+    }
+    return;
+  }
+
+  const altApplyBtn = e.target.closest('.alt-apply-btn');
+  if (altApplyBtn) {
+    const row = altApplyBtn.closest('.food-row');
+    if (!row) return;
+    applyAlternativeFoodSelection(row);
+    return;
+  }
+
   const saveChangesBtn = e.target.closest('.save-changes-btn');
   if (saveChangesBtn) {
     saveDashboardChanges().catch(error => console.error('Failed to save dashboard:', error));
@@ -969,14 +1032,22 @@ document.addEventListener('click', e => {
     return;
   }
 
-  closeAlternativeLists();
+  if (e.target.closest('.food-alt-wrap')) return;
+  closeAlternativeMenus();
+});
+
+document.addEventListener('change', e => {
+  const altSelect = e.target.closest('.alt-select');
+  if (!altSelect) return;
+  const wrap = altSelect.closest('.food-alt-wrap');
+  const applyBtn = wrap?.querySelector('.alt-apply-btn');
+  if (applyBtn) applyBtn.disabled = !altSelect.value;
 });
 
 async function initApp() {
   saveOverlay = document.getElementById('savingOverlay');
   saveOverlayLabel = document.getElementById('savingOverlayLabel');
   setupImageModal();
-  setupAlternativeDropdowns();
   beginSaving('Φόρτωση δεδομένων...');
   try {
     clearDashboardMealCards();
@@ -986,6 +1057,7 @@ async function initApp() {
     await loadDashboard();
 
     updateFoodImages();
+    renderAlternativeMenus();
     await applyTargets({ persistRemote: false });
     setHasUnsavedChanges(false);
   } finally {
