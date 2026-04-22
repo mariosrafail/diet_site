@@ -25,6 +25,7 @@
             <thead>
               <tr>
                 <th>Τρόφιμο</th>
+                <th>Κατηγορία</th>
                 <th>Μονάδα</th>
                 <th>kcal</th>
                 <th>P</th>
@@ -41,6 +42,16 @@
         <div class="food-db-form">
           <h3>Προσθήκη / Ενημέρωση</h3>
           <label><span>Όνομα</span><input id="dbNameInput" type="text" placeholder="π.χ. Γιαούρτι 2%" /></label>
+          <label>
+            <span>Κατηγορία</span>
+            <select id="dbCategoryInput">
+              <option value="vegetables">Λαχανικά</option>
+              <option value="fruit">Φρούτα (υδατάνθρακας)</option>
+              <option value="protein" selected>Πηγή πρωτεΐνης</option>
+              <option value="carb">Πηγή υδατάνθρακα</option>
+              <option value="fat">Πηγή λιπαρών</option>
+            </select>
+          </label>
           <div class="food-db-form-grid">
             <label><span>Μονάδα</span><select id="dbUnitInput"><option value="g">g</option><option value="ml">ml</option><option value="τεμ">τεμ</option></select></label>
             <label><span>kcal</span><input id="dbCalInput" type="number" min="0" step="0.1" value="100" /></label>

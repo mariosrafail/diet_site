@@ -30,6 +30,14 @@ const dockRefs = {
 
 const FOODS_API_ENDPOINT = '/api/foods';
 const USER_SLUG = 'konstantinos';
+const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat'];
+const FOOD_CATEGORY_LABELS = {
+  vegetables: 'Λαχανικά',
+  fruit: 'Φρούτα (υδατάνθρακας)',
+  protein: 'Πηγή πρωτεΐνης',
+  carb: 'Πηγή υδατάνθρακα',
+  fat: 'Πηγή λιπαρών'
+};
 
 let targets = { calories: 2500, protein: 160, carbs: 255, fat: 80 };
 let foodDb = [];
@@ -88,9 +96,13 @@ function toFoodKey(name) {
 }
 
 function normalizeFoodEntry(entry) {
+  const rawCategory = String(entry.category || '').trim().toLowerCase();
+  const category = FOOD_CATEGORIES.includes(rawCategory) ? rawCategory : 'protein';
+
   return {
     id: entry.id,
     name: String(entry.name || '').trim(),
+    category,
     unit: normalizeUnit(entry.unit),
     cal: Number(entry.cal || 0),
     protein: Number(entry.protein || 0),
@@ -352,15 +364,26 @@ function refreshDbSelectOptions() {
   document.querySelectorAll('.db-select').forEach(select => {
     const selected = select.value;
     select.innerHTML = '<option value="">Επιλογή από βάση</option>';
-    foodDb
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name, 'el'))
-      .forEach(food => {
+
+    FOOD_CATEGORIES.forEach(category => {
+      const categoryFoods = foodDb
+        .filter(food => food.category === category)
+        .sort((a, b) => a.name.localeCompare(b.name, 'el'));
+
+      if (!categoryFoods.length) return;
+
+      const group = document.createElement('optgroup');
+      group.label = FOOD_CATEGORY_LABELS[category] || category;
+
+      categoryFoods.forEach(food => {
         const option = document.createElement('option');
         option.value = food.id;
         option.textContent = `${food.name} (${round(food.protein)}P/${round(food.carbs)}C/${round(food.fat)}F)`;
-        select.appendChild(option);
+        group.appendChild(option);
       });
+
+      select.appendChild(group);
+    });
 
     if (selected && foodDb.some(item => item.id === selected)) select.value = selected;
   });

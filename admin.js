@@ -1,10 +1,19 @@
 const FOODS_API_ENDPOINT = '/api/foods';
 const FOOD_IMAGES_API_ENDPOINT = '/api/food-images';
 const FOOD_IMAGES_CATALOG_ENDPOINT = '/assets/food_images/catalog.json';
+const FOOD_CATEGORIES = ['vegetables', 'fruit', 'protein', 'carb', 'fat'];
+const FOOD_CATEGORY_LABELS = {
+  vegetables: 'Λαχανικά',
+  fruit: 'Φρούτα (υδατάνθρακας)',
+  protein: 'Πηγή πρωτεΐνης',
+  carb: 'Πηγή υδατάνθρακα',
+  fat: 'Πηγή λιπαρών'
+};
 
 const refs = {
   foodDbTable: document.getElementById('foodDbTable'),
   dbNameInput: document.getElementById('dbNameInput'),
+  dbCategoryInput: document.getElementById('dbCategoryInput'),
   dbUnitInput: document.getElementById('dbUnitInput'),
   dbCalInput: document.getElementById('dbCalInput'),
   dbProteinInput: document.getElementById('dbProteinInput'),
@@ -24,9 +33,13 @@ function round(value) {
 }
 
 function normalizeFoodEntry(entry) {
+  const rawCategory = String(entry.category || '').trim().toLowerCase();
+  const category = FOOD_CATEGORIES.includes(rawCategory) ? rawCategory : 'protein';
+
   return {
     id: entry.id,
     name: String(entry.name || '').trim(),
+    category,
     unit: String(entry.unit || 'g'),
     cal: Number(entry.cal || 0),
     protein: Number(entry.protein || 0),
@@ -82,6 +95,7 @@ function updateImagePreview() {
 
 function fillForm(food) {
   refs.dbNameInput.value = food.name;
+  refs.dbCategoryInput.value = food.category || 'protein';
   refs.dbUnitInput.value = food.unit;
   refs.dbCalInput.value = String(food.cal);
   refs.dbProteinInput.value = String(food.protein);
@@ -95,12 +109,17 @@ function renderFoodsTable() {
   refs.foodDbTable.innerHTML = '';
   foods
     .slice()
-    .sort((a, b) => a.name.localeCompare(b.name, 'el'))
+    .sort((a, b) => {
+      const byCategory = (FOOD_CATEGORIES.indexOf(a.category) - FOOD_CATEGORIES.indexOf(b.category));
+      if (byCategory !== 0) return byCategory;
+      return a.name.localeCompare(b.name, 'el');
+    })
     .forEach(food => {
       const tr = document.createElement('tr');
 
       const values = [
         food.name,
+        FOOD_CATEGORY_LABELS[food.category] || FOOD_CATEGORY_LABELS.protein,
         food.unit,
         String(round(food.cal)),
         String(round(food.protein)),
@@ -150,6 +169,7 @@ function renderFoodsTable() {
 async function saveFood() {
   const payload = {
     name: refs.dbNameInput.value.trim(),
+    category: refs.dbCategoryInput.value,
     unit: refs.dbUnitInput.value,
     cal: Number(refs.dbCalInput.value || 0),
     protein: Number(refs.dbProteinInput.value || 0),

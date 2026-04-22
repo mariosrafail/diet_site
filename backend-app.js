@@ -17,6 +17,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+const FOOD_CATEGORY_VALUES = ['vegetables', 'fruit', 'protein', 'carb', 'fat'];
+
 const DEFAULT_FOOD_DB = [
   { name: 'Αυγά αχυρώνα ΜΑΡΑΤΑ μεσαία', unit: 'τεμ', cal: 82.5, protein: 7.2, carbs: 0.6, fat: 6.1, image_path: 'assets/food_images/auga.jpg' },
   { name: 'Ασπράδι αυγού ΒΛΑΧΑΚΗ', unit: 'ml', cal: 50, protein: 10, carbs: 1.1, fat: 0.5, image_path: 'assets/food_images/aspradi.jpg' },
@@ -82,15 +84,37 @@ function normalizeImagePath(raw) {
   return clean || fallback;
 }
 
+function inferCategoryFromImagePath(imagePath) {
+  const pathValue = normalizeImagePath(imagePath);
+  if (['assets/food_images/psomi.jpg', 'assets/food_images/basmati.jpg', 'assets/food_images/ruzogkofretes.jpg', 'assets/food_images/makaronia.jpg'].includes(pathValue)) return 'carb';
+  if (['assets/food_images/ladi.jpg', 'assets/food_images/kshroi.jpg'].includes(pathValue)) return 'fat';
+  return 'protein';
+}
+
+function normalizeFoodCategory(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (FOOD_CATEGORY_VALUES.includes(value)) return value;
+
+  if (value === 'vegetable' || value === 'vegetables' || value === 'veg' || value === 'λαχανικα' || value === 'λαχανικά') return 'vegetables';
+  if (value === 'fruit' || value === 'fruits' || value === 'fruit_carb' || value === 'frouta' || value === 'φρουτα' || value === 'φρούτα') return 'fruit';
+  if (value === 'protein' || value === 'proteins' || value === 'πρωτεινη' || value === 'πρωτεΐνη') return 'protein';
+  if (value === 'carb' || value === 'carbs' || value === 'carbohydrate' || value === 'υδατανθρακας' || value === 'υδατανθράκας' || value === 'υδατανθρακες' || value === 'υδατάνθρακες') return 'carb';
+  if (value === 'fat' || value === 'fats' || value === 'λιπαρα' || value === 'λιπαρά') return 'fat';
+
+  return 'protein';
+}
+
 function normalizeFood(input) {
+  const imagePath = normalizeImagePath(input.image_path);
   return {
     name: String(input.name || '').trim(),
+    category: normalizeFoodCategory(input.category || inferCategoryFromImagePath(imagePath)),
     unit: normalizeUnit(input.unit),
     cal: Number(input.cal || 0),
     protein: Number(input.protein || 0),
     carbs: Number(input.carbs || 0),
     fat: Number(input.fat || 0),
-    image_path: normalizeImagePath(input.image_path)
+    image_path: imagePath
   };
 }
 
@@ -129,6 +153,7 @@ async function ensureSchema() {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name TEXT NOT NULL,
           food_key TEXT NOT NULL UNIQUE,
+          category TEXT NOT NULL DEFAULT 'protein' CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat')),
           unit TEXT NOT NULL CHECK (unit IN ('g', 'ml', 'τεμ')),
           cal DOUBLE PRECISION NOT NULL CHECK (cal >= 0),
           protein DOUBLE PRECISION NOT NULL CHECK (protein >= 0),
@@ -183,6 +208,45 @@ async function ensureSchema() {
         );
       `);
 
+      await pool.query('ALTER TABLE foods ADD COLUMN IF NOT EXISTS category TEXT');
+      await pool.query(
+        `UPDATE foods
+         SET category = 'protein'
+         WHERE category IS NULL OR BTRIM(category) = ''`
+      );
+      await pool.query(`ALTER TABLE foods ALTER COLUMN category SET DEFAULT 'protein'`);
+      await pool.query(`ALTER TABLE foods ALTER COLUMN category SET NOT NULL`);
+      await pool.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'foods_category_check'
+          ) THEN
+            ALTER TABLE foods
+            ADD CONSTRAINT foods_category_check
+            CHECK (category IN ('vegetables', 'fruit', 'protein', 'carb', 'fat'));
+          END IF;
+        END $$;
+      `);
+      await pool.query(
+        `UPDATE foods
+         SET category = CASE
+           WHEN image_path IN ('assets/food_images/psomi.jpg', 'assets/food_images/basmati.jpg', 'assets/food_images/ruzogkofretes.jpg', 'assets/food_images/makaronia.jpg') THEN 'carb'
+           WHEN image_path IN ('assets/food_images/ladi.jpg', 'assets/food_images/kshroi.jpg') THEN 'fat'
+           ELSE category
+         END
+         WHERE image_path IN (
+           'assets/food_images/psomi.jpg',
+           'assets/food_images/basmati.jpg',
+           'assets/food_images/ruzogkofretes.jpg',
+           'assets/food_images/makaronia.jpg',
+           'assets/food_images/ladi.jpg',
+           'assets/food_images/kshroi.jpg'
+         )`
+      );
+
       if (BOOTSTRAP_DEFAULT_DATA) {
         const foodsCountRes = await pool.query('SELECT COUNT(*)::int AS count FROM foods');
         const shouldSeedFoods = Number(foodsCountRes.rows[0]?.count || 0) === 0;
@@ -192,11 +256,11 @@ async function ensureSchema() {
             const food = normalizeFood(entry);
             const key = toFoodKey(food.name);
             await pool.query(
-              `INSERT INTO foods (name, food_key, unit, cal, protein, carbs, fat, image_path)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              `INSERT INTO foods (name, food_key, category, unit, cal, protein, carbs, fat, image_path)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                ON CONFLICT (food_key)
                DO NOTHING`,
-              [food.name, key, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
+              [food.name, key, food.category, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
             );
           }
         }
@@ -280,7 +344,7 @@ app.get('/api/health', async (_req, res) => {
 
 app.get('/api/foods', async (_req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, unit, cal, protein, carbs, fat, image_path FROM foods ORDER BY name ASC');
+    const result = await pool.query('SELECT id, name, category, unit, cal, protein, carbs, fat, image_path FROM foods ORDER BY category ASC, name ASC');
     res.json(result.rows);
   } catch {
     res.status(500).json({ error: 'read_failed' });
@@ -297,11 +361,12 @@ app.post('/api/foods', async (req, res) => {
   try {
     const key = toFoodKey(food.name);
     const result = await pool.query(
-      `INSERT INTO foods (name, food_key, unit, cal, protein, carbs, fat, image_path)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO foods (name, food_key, category, unit, cal, protein, carbs, fat, image_path)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (food_key)
        DO UPDATE SET
          name = EXCLUDED.name,
+         category = EXCLUDED.category,
          unit = EXCLUDED.unit,
          cal = EXCLUDED.cal,
          protein = EXCLUDED.protein,
@@ -309,8 +374,8 @@ app.post('/api/foods', async (req, res) => {
          fat = EXCLUDED.fat,
          image_path = EXCLUDED.image_path,
          updated_at = NOW()
-       RETURNING id, name, unit, cal, protein, carbs, fat, image_path`,
-      [food.name, key, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
+       RETURNING id, name, category, unit, cal, protein, carbs, fat, image_path`,
+      [food.name, key, food.category, food.unit, food.cal, food.protein, food.carbs, food.fat, food.image_path]
     );
     res.json(result.rows[0]);
   } catch {
@@ -366,7 +431,7 @@ app.get('/api/users/:slug/dashboard', async (req, res) => {
     const mealsRes = await pool.query(
       `SELECT m.meal_key, m.title, m.description, m.sort_order,
               i.row_key, i.qty,
-              f.id AS food_id, f.name AS food_name, f.unit AS food_unit,
+              f.id AS food_id, f.name AS food_name, f.category AS food_category, f.unit AS food_unit,
               f.cal AS food_cal, f.protein AS food_protein, f.carbs AS food_carbs, f.fat AS food_fat, f.image_path AS food_image_path
        FROM user_meals m
        LEFT JOIN user_meal_items i ON i.meal_id = m.id
@@ -394,6 +459,7 @@ app.get('/api/users/:slug/dashboard', async (req, res) => {
           food: {
             id: row.food_id,
             name: row.food_name,
+            category: row.food_category,
             unit: row.food_unit,
             cal: Number(row.food_cal),
             protein: Number(row.food_protein),

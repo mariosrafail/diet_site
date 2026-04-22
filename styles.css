@@ -10,6 +10,13 @@
   --warn: #f59e0b;
   --danger: #f87171;
   --shadow: 0 20px 60px rgba(0,0,0,0.35);
+  --btn-flat-bg: #1b2640;
+  --btn-flat-bg-hover: #223156;
+  --btn-flat-border: rgba(180, 202, 244, 0.28);
+  --btn-flat-text: #eaf1ff;
+  --btn-flat-accent: #60a5fa;
+  --btn-flat-success: #6ee7b7;
+  --btn-flat-danger: #f87171;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -131,6 +138,52 @@ label span { display: block; color: var(--muted); margin-bottom: 8px; }
 input, select, button {
   font: inherit;
 }
+button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--btn-flat-border);
+  background: var(--btn-flat-bg);
+  color: var(--btn-flat-text);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform .2s ease, background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, filter .2s ease;
+  animation: buttonEnter .45s ease both;
+}
+button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 15%, rgba(255,255,255,0.18) 50%, transparent 85%);
+  transform: translateX(-140%);
+  pointer-events: none;
+}
+button:hover {
+  transform: translateY(-1px);
+  background: var(--btn-flat-bg-hover);
+  border-color: rgba(203, 219, 250, 0.45);
+}
+button:hover::before {
+  animation: btnShimmer .85s ease;
+}
+button:active {
+  transform: translateY(0) scale(0.98);
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.3);
+  animation: btnFocusPulse .65s ease;
+}
+@keyframes buttonEnter {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes btnShimmer {
+  to { transform: translateX(140%); }
+}
+@keyframes btnFocusPulse {
+  0% { box-shadow: 0 0 0 0 rgba(96,165,250,0.38); }
+  100% { box-shadow: 0 0 0 3px rgba(96,165,250,0.3); }
+}
 input, select {
   width: 100%;
   background: rgba(255,255,255,0.06);
@@ -151,16 +204,19 @@ select optgroup {
 }
 .btn {
   margin-top: 16px;
-  background: linear-gradient(135deg, var(--accent-2), var(--accent));
-  color: #08101c;
-  border: 0;
+  background: #203357;
+  color: #edf3ff;
+  border: 1px solid rgba(174, 201, 247, 0.45);
   padding: 14px 18px;
-  border-radius: 16px;
+  border-radius: 12px;
   font-weight: 800;
-  cursor: pointer;
-  transition: transform .2s ease, box-shadow .2s ease;
+  letter-spacing: 0.01em;
 }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(96,165,250,0.35); }
+.btn:hover {
+  background: #2a3f68;
+  border-color: rgba(196, 216, 255, 0.62);
+  box-shadow: 0 0 0 2px rgba(96,165,250,0.15);
+}
 .meals { display: grid; gap: 16px; }
 .meal-card {
   border-radius: 24px;
@@ -329,26 +385,31 @@ select optgroup {
 .icon-btn {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.08);
-  color: #e8f1ff;
-  cursor: pointer;
+  border-radius: 9px;
+  border: 1px solid rgba(198, 213, 247, 0.35);
+  background: #1a2845;
+  color: #eaf1ff;
   font-size: 16px;
   line-height: 1;
 }
 .icon-btn:hover {
-  background: rgba(255,255,255,0.14);
+  background: #23355b;
+  border-color: rgba(210, 223, 248, 0.56);
 }
 .icon-btn.active {
   border-color: rgba(110,231,183,0.55);
-  background: rgba(110,231,183,0.14);
-  color: #dcfce7;
+  background: rgba(17, 72, 58, 0.82);
+  color: #ddfdeb;
+  animation: btnActivePulse 1.2s ease-in-out infinite;
 }
 .icon-btn.danger {
   border-color: rgba(248,113,113,0.42);
-  color: #ffd3d3;
-  background: rgba(248,113,113,0.14);
+  color: #ffe1e1;
+  background: rgba(86, 31, 31, 0.88);
+}
+@keyframes btnActivePulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
 }
 .food-row.row-locked {
   grid-template-columns: 1fr auto auto;
@@ -371,16 +432,19 @@ select optgroup {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(110,231,183,0.35);
-  background: rgba(110,231,183,0.1);
-  color: #d8fbe8;
+  border: 1px solid rgba(126, 237, 193, 0.44);
+  background: #17382f;
+  color: #dffdef;
   border-radius: 999px;
   padding: 8px 12px;
   font-weight: 700;
-  cursor: pointer;
-  transition: background .2s ease, transform .2s ease;
+  animation: btnDrift 2.6s ease-in-out infinite;
 }
-.alt-toggle:hover { background: rgba(110,231,183,0.16); transform: translateY(-1px); }
+.alt-toggle:hover { background: #1c463b; }
+@keyframes btnDrift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
 .alt-symbol {
   width: 22px;
   height: 22px;
@@ -408,15 +472,14 @@ select optgroup {
   text-align: left;
   padding: 9px 11px;
   border-radius: 10px;
-  background: rgba(255,255,255,0.04);
+  background: #1a2846;
   color: #e5edff;
   font-size: 14px;
-  border: 1px solid rgba(255,255,255,0.08);
-  cursor: pointer;
+  border: 1px solid rgba(190, 207, 243, 0.22);
 }
 .alt-option:hover {
-  border-color: rgba(96,165,250,0.5);
-  background: rgba(96,165,250,0.15);
+  border-color: rgba(96,165,250,0.62);
+  background: #22345a;
 }
 .optional .food-main label::after { content: ' · προαιρετικό'; color: var(--accent); font-weight: 600; }
 .sweet-grid, .grocery-grid, .totals-grid { display: grid; gap: 14px; }
@@ -512,9 +575,9 @@ select optgroup {
 
 .btn.btn-secondary {
   margin-top: 0;
-  background: rgba(255,255,255,0.08);
-  color: #e8f1ff;
-  border: 1px solid rgba(255,255,255,0.18);
+  background: #1a2744;
+  color: #eaf1ff;
+  border: 1px solid rgba(183, 205, 245, 0.34);
 }
 .save-changes-btn {
   position: fixed !important;
@@ -530,7 +593,8 @@ select optgroup {
 }
 
 .btn.btn-secondary:hover {
-  box-shadow: 0 10px 26px rgba(10, 16, 35, 0.35);
+  background: #22345a;
+  box-shadow: 0 0 0 2px rgba(96,165,250,0.13);
 }
 
 .meal-actions {
@@ -541,24 +605,33 @@ select optgroup {
 }
 
 .mini-btn {
-  border: 1px solid rgba(110,231,183,0.35);
-  background: rgba(110,231,183,0.14);
-  color: #dcfce7;
+  border: 1px solid rgba(124, 235, 192, 0.48);
+  background: #17392f;
+  color: #ddfdeb;
   border-radius: 999px;
   padding: 7px 11px;
   font-size: 13px;
   font-weight: 700;
-  cursor: pointer;
+  letter-spacing: 0.01em;
 }
 
 .mini-btn:hover {
-  background: rgba(110,231,183,0.2);
+  background: #1e4a3d;
 }
 
 .mini-btn.danger {
-  border-color: rgba(248,113,113,0.4);
-  background: rgba(248,113,113,0.14);
-  color: #ffd3d3;
+  border-color: rgba(248,113,113,0.55);
+  background: #522727;
+  color: #ffe2e2;
+}
+
+.save-changes-btn {
+  animation: savePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes savePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(96,165,250,0.22); }
+  50% { box-shadow: 0 0 0 6px rgba(96,165,250,0); }
 }
 
 .food-tools {
@@ -603,13 +676,12 @@ select optgroup {
 
 .remove-row-btn {
   justify-self: start;
-  border: 1px solid rgba(248,113,113,0.4);
-  background: rgba(248,113,113,0.14);
-  color: #ffd3d3;
+  border: 1px solid rgba(248,113,113,0.55);
+  background: #542828;
+  color: #ffe3e3;
   border-radius: 12px;
   padding: 8px 10px;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .custom-meal {
