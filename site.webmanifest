@@ -1,0 +1,16 @@
+{
+  "name": "Διατροφή Κωνσταντίνου Τασιούλη",
+  "short_name": "Diet Plan",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ef",
+  "theme_color": "#f7f5ef",
+  "icons": [
+    {
+      "src": "assets/branding/site-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
