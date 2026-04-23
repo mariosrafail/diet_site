@@ -26,10 +26,7 @@
   userSlugSubmit: document.getElementById('userSlugSubmit'),
   userGateError: document.getElementById('userGateError'),
   activeUserLabel: document.getElementById('activeUserLabel'),
-  logoutBtn: document.getElementById('logoutBtn'),
-  installAppCard: document.getElementById('installAppCard'),
-  installAppBtn: document.getElementById('installAppBtn'),
-  installAppHint: document.getElementById('installAppHint')
+  logoutBtn: document.getElementById('logoutBtn')
 };
 
 const dockRefs = {
@@ -68,6 +65,8 @@ let currentUserFullName = '';
 let isAdminMode = false;
 let autoSaveTargetsTimer = null;
 let deferredInstallPrompt = null;
+let installChoicePending = false;
+let installPromptShownThisSession = false;
 
 function isStandaloneMode() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -90,75 +89,98 @@ function isSafariBrowser() {
   return /safari/i.test(ua) && !/chrome|crios|android/i.test(ua);
 }
 
-function updateInstallCardVisibility() {
-  const installCard = refs.installAppCard;
-  const installBtn = refs.installAppBtn;
-  const installHint = refs.installAppHint;
-  if (!installCard || !installBtn || !installHint) return;
+function shouldOfferInstallPrompt() {
+  return isMobileDevice() && !isStandaloneMode();
+}
 
-  if (!isMobileDevice() || isStandaloneMode()) {
-    installCard.hidden = true;
+async function triggerNativeInstallPrompt() {
+  if (!deferredInstallPrompt) return false;
+  try {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    return true;
+  } catch (error) {
+    console.error('Install prompt failed:', error);
+    return false;
+  } finally {
+    deferredInstallPrompt = null;
+    installChoicePending = false;
+  }
+}
+
+async function openShareSheetForInstall() {
+  if (!navigator.share) return false;
+  try {
+    await navigator.share({
+      title: document.title || 'Diet Plan',
+      text: 'Άνοιξέ το γρήγορα από την αρχική οθόνη.',
+      url: window.location.href
+    });
+    return true;
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.error('Share sheet failed:', error);
+    }
+    return false;
+  }
+}
+
+function showInstallPromptAtStartup() {
+  if (installPromptShownThisSession || !shouldOfferInstallPrompt()) return;
+  installPromptShownThisSession = true;
+
+  const wantsInstall = window.confirm('Θέλεις να προσθέσεις την εφαρμογή στην αρχική οθόνη;');
+  if (!wantsInstall) return;
+
+  if (deferredInstallPrompt) {
+    triggerNativeInstallPrompt();
     return;
   }
 
-  const canShowNativePrompt = Boolean(deferredInstallPrompt);
-  const canShowIosInstructions = isIosLikeDevice() && isSafariBrowser();
-  if (!canShowNativePrompt && !canShowIosInstructions) {
-    installCard.hidden = true;
+  installChoicePending = true;
+  if (isIosLikeDevice() && isSafariBrowser()) {
+    openShareSheetForInstall().then(shared => {
+      if (!shared) {
+        window.alert('Για iPhone/iPad: Πάτα Share και μετά Add to Home Screen.');
+      }
+    });
     return;
   }
 
-  installCard.hidden = false;
-  installBtn.disabled = false;
-  installHint.textContent = canShowNativePrompt
-    ? 'Πρόσθεσέ το στην αρχική οθόνη για γρήγορο άνοιγμα.'
-    : 'Σε iPhone: Share -> Add to Home Screen.';
+  openShareSheetForInstall().then(shared => {
+    if (!shared) {
+      window.alert('Άνοιξε το menu του browser και επίλεξε Add to Home Screen.');
+    }
+  });
 }
 
 function setupInstallPromptCta() {
-  const installBtn = refs.installAppBtn;
-  const installHint = refs.installAppHint;
-  if (!installBtn || !installHint) return;
-
-  installBtn.addEventListener('click', async () => {
-    if (deferredInstallPrompt) {
-      try {
-        deferredInstallPrompt.prompt();
-        await deferredInstallPrompt.userChoice;
-      } catch (error) {
-        console.error('Install prompt failed:', error);
-      } finally {
-        deferredInstallPrompt = null;
-        updateInstallCardVisibility();
-      }
-      return;
-    }
-
-    if (isIosLikeDevice() && isSafariBrowser()) {
-      installHint.textContent = 'Πάτα Share και μετά Add to Home Screen.';
-    }
-  });
-
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
-    updateInstallCardVisibility();
+    if (installChoicePending && shouldOfferInstallPrompt()) {
+      triggerNativeInstallPrompt();
+    }
   });
 
   window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    updateInstallCardVisibility();
+    installChoicePending = false;
   });
 
   const mobileMediaQuery = window.matchMedia('(max-width: 980px)');
-  const handleViewportChange = () => updateInstallCardVisibility();
+  const handleViewportChange = () => {
+    if (!isMobileDevice() || isStandaloneMode()) {
+      installChoicePending = false;
+    }
+  };
   if (typeof mobileMediaQuery.addEventListener === 'function') {
     mobileMediaQuery.addEventListener('change', handleViewportChange);
   } else if (typeof mobileMediaQuery.addListener === 'function') {
     mobileMediaQuery.addListener(handleViewportChange);
   }
 
-  updateInstallCardVisibility();
+  setTimeout(showInstallPromptAtStartup, 250);
 }
 
 function isAdminUserSlug(slug) {
