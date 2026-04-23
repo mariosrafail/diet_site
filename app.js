@@ -26,7 +26,10 @@
   userSlugSubmit: document.getElementById('userSlugSubmit'),
   userGateError: document.getElementById('userGateError'),
   activeUserLabel: document.getElementById('activeUserLabel'),
-  logoutBtn: document.getElementById('logoutBtn')
+  logoutBtn: document.getElementById('logoutBtn'),
+  installAppCard: document.getElementById('installAppCard'),
+  installAppBtn: document.getElementById('installAppBtn'),
+  installAppHint: document.getElementById('installAppHint')
 };
 
 const dockRefs = {
@@ -64,6 +67,99 @@ let currentUserSlug = '';
 let currentUserFullName = '';
 let isAdminMode = false;
 let autoSaveTargetsTimer = null;
+let deferredInstallPrompt = null;
+
+function isStandaloneMode() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isMobileDevice() {
+  return window.matchMedia('(max-width: 980px)').matches
+    || window.matchMedia('(pointer: coarse)').matches
+    || /android|iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+}
+
+function isIosLikeDevice() {
+  const ua = window.navigator.userAgent || '';
+  const touchMac = window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1;
+  return /iphone|ipad|ipod/i.test(ua) || touchMac;
+}
+
+function isSafariBrowser() {
+  const ua = window.navigator.userAgent || '';
+  return /safari/i.test(ua) && !/chrome|crios|android/i.test(ua);
+}
+
+function updateInstallCardVisibility() {
+  const installCard = refs.installAppCard;
+  const installBtn = refs.installAppBtn;
+  const installHint = refs.installAppHint;
+  if (!installCard || !installBtn || !installHint) return;
+
+  if (!isMobileDevice() || isStandaloneMode()) {
+    installCard.hidden = true;
+    return;
+  }
+
+  const canShowNativePrompt = Boolean(deferredInstallPrompt);
+  const canShowIosInstructions = isIosLikeDevice() && isSafariBrowser();
+  if (!canShowNativePrompt && !canShowIosInstructions) {
+    installCard.hidden = true;
+    return;
+  }
+
+  installCard.hidden = false;
+  installBtn.disabled = false;
+  installHint.textContent = canShowNativePrompt
+    ? 'Πρόσθεσέ το στην αρχική οθόνη για γρήγορο άνοιγμα.'
+    : 'Σε iPhone: Share -> Add to Home Screen.';
+}
+
+function setupInstallPromptCta() {
+  const installBtn = refs.installAppBtn;
+  const installHint = refs.installAppHint;
+  if (!installBtn || !installHint) return;
+
+  installBtn.addEventListener('click', async () => {
+    if (deferredInstallPrompt) {
+      try {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+      } catch (error) {
+        console.error('Install prompt failed:', error);
+      } finally {
+        deferredInstallPrompt = null;
+        updateInstallCardVisibility();
+      }
+      return;
+    }
+
+    if (isIosLikeDevice() && isSafariBrowser()) {
+      installHint.textContent = 'Πάτα Share και μετά Add to Home Screen.';
+    }
+  });
+
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    updateInstallCardVisibility();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    updateInstallCardVisibility();
+  });
+
+  const mobileMediaQuery = window.matchMedia('(max-width: 980px)');
+  const handleViewportChange = () => updateInstallCardVisibility();
+  if (typeof mobileMediaQuery.addEventListener === 'function') {
+    mobileMediaQuery.addEventListener('change', handleViewportChange);
+  } else if (typeof mobileMediaQuery.addListener === 'function') {
+    mobileMediaQuery.addListener(handleViewportChange);
+  }
+
+  updateInstallCardVisibility();
+}
 
 function isAdminUserSlug(slug) {
   return normalizeUserSlug(slug) === ADMIN_SLUG;
@@ -1631,6 +1727,7 @@ async function initApp() {
   saveOverlay = document.getElementById('savingOverlay');
   saveOverlayLabel = document.getElementById('savingOverlayLabel');
   setupImageModal();
+  setupInstallPromptCta();
   updateActiveUserLabel();
 }
 
