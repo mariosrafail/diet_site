@@ -26,7 +26,10 @@
   userSlugSubmit: document.getElementById('userSlugSubmit'),
   userGateError: document.getElementById('userGateError'),
   activeUserLabel: document.getElementById('activeUserLabel'),
-  logoutBtn: document.getElementById('logoutBtn')
+  logoutBtn: document.getElementById('logoutBtn'),
+  installAppCard: document.getElementById('installAppCard'),
+  installAppBtn: document.getElementById('installAppBtn'),
+  installAppHint: document.getElementById('installAppHint')
 };
 
 const dockRefs = {
@@ -65,8 +68,6 @@ let currentUserFullName = '';
 let isAdminMode = false;
 let autoSaveTargetsTimer = null;
 let deferredInstallPrompt = null;
-let installChoicePending = false;
-let installPromptShownThisSession = false;
 
 function isStandaloneMode() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -89,98 +90,47 @@ function isSafariBrowser() {
   return /safari/i.test(ua) && !/chrome|crios|android/i.test(ua);
 }
 
-function shouldOfferInstallPrompt() {
-  return isMobileDevice() && !isStandaloneMode();
-}
-
-async function triggerNativeInstallPrompt() {
-  if (!deferredInstallPrompt) return false;
-  try {
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    return true;
-  } catch (error) {
-    console.error('Install prompt failed:', error);
-    return false;
-  } finally {
-    deferredInstallPrompt = null;
-    installChoicePending = false;
-  }
-}
-
-async function openShareSheetForInstall() {
-  if (!navigator.share) return false;
-  try {
-    await navigator.share({
-      title: document.title || 'Diet Plan',
-      text: 'Άνοιξέ το γρήγορα από την αρχική οθόνη.',
-      url: window.location.href
-    });
-    return true;
-  } catch (error) {
-    if (error?.name !== 'AbortError') {
-      console.error('Share sheet failed:', error);
-    }
-    return false;
-  }
-}
-
-function showInstallPromptAtStartup() {
-  if (installPromptShownThisSession || !shouldOfferInstallPrompt()) return;
-  installPromptShownThisSession = true;
-
-  const wantsInstall = window.confirm('Θέλεις να προσθέσεις την εφαρμογή στην αρχική οθόνη;');
-  if (!wantsInstall) return;
-
-  if (deferredInstallPrompt) {
-    triggerNativeInstallPrompt();
-    return;
-  }
-
-  installChoicePending = true;
-  if (isIosLikeDevice() && isSafariBrowser()) {
-    openShareSheetForInstall().then(shared => {
-      if (!shared) {
-        window.alert('Για iPhone/iPad: Πάτα Share και μετά Add to Home Screen.');
-      }
-    });
-    return;
-  }
-
-  openShareSheetForInstall().then(shared => {
-    if (!shared) {
-      window.alert('Άνοιξε το menu του browser και επίλεξε Add to Home Screen.');
-    }
-  });
+function updateInstallCardVisibility() {
+  const installCard = refs.installAppCard;
+  if (!installCard) return;
+  installCard.hidden = !isMobileDevice() || isStandaloneMode();
 }
 
 function setupInstallPromptCta() {
+  const installBtn = refs.installAppBtn;
+  const installHint = refs.installAppHint;
+  if (!installBtn || !installHint) return;
+
+  installBtn.addEventListener('click', () => {
+    if (isIosLikeDevice() && isSafariBrowser()) {
+      installHint.textContent = 'Πάτα το Share πάνω δεξιά και μετά Add to Home Screen.';
+      window.alert('Σε iPhone/iPad: Πάτα το Share πάνω δεξιά και μετά Add to Home Screen.');
+      return;
+    }
+    installHint.textContent = 'Πάτα το menu/Share πάνω δεξιά και μετά Add to Home Screen.';
+    window.alert('Πάτα το menu ή Share πάνω δεξιά και μετά Add to Home Screen.');
+  });
+
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstallPrompt = event;
-    if (installChoicePending && shouldOfferInstallPrompt()) {
-      triggerNativeInstallPrompt();
-    }
+    updateInstallCardVisibility();
   });
 
   window.addEventListener('appinstalled', () => {
     deferredInstallPrompt = null;
-    installChoicePending = false;
+    updateInstallCardVisibility();
   });
 
   const mobileMediaQuery = window.matchMedia('(max-width: 980px)');
-  const handleViewportChange = () => {
-    if (!isMobileDevice() || isStandaloneMode()) {
-      installChoicePending = false;
-    }
-  };
+  const handleViewportChange = () => updateInstallCardVisibility();
   if (typeof mobileMediaQuery.addEventListener === 'function') {
     mobileMediaQuery.addEventListener('change', handleViewportChange);
   } else if (typeof mobileMediaQuery.addListener === 'function') {
     mobileMediaQuery.addListener(handleViewportChange);
   }
 
-  setTimeout(showInstallPromptAtStartup, 250);
+  updateInstallCardVisibility();
 }
 
 function isAdminUserSlug(slug) {
