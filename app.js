@@ -104,11 +104,9 @@ function setupInstallPromptCta() {
   installBtn.addEventListener('click', () => {
     if (isIosLikeDevice() && isSafariBrowser()) {
       installHint.textContent = 'Πάτα το Share πάνω δεξιά και μετά Add to Home Screen.';
-      window.alert('Σε iPhone/iPad: Πάτα το Share πάνω δεξιά και μετά Add to Home Screen.');
       return;
     }
     installHint.textContent = 'Πάτα το menu/Share πάνω δεξιά και μετά Add to Home Screen.';
-    window.alert('Πάτα το menu ή Share πάνω δεξιά και μετά Add to Home Screen.');
   });
 
   window.addEventListener('beforeinstallprompt', event => {
