@@ -79,6 +79,7 @@ const DEFAULT_USER_PROFILES = [
     user: {
       slug: 'konstantinos',
       full_name: 'Konstantinos',
+      height: 1.85,
       weight: 93,
       proteinMultiplier: 1.7,
       calorieTarget: 2500
@@ -105,6 +106,7 @@ const DEFAULT_USER_PROFILES = [
     user: {
       slug: 'marios',
       full_name: 'Marios',
+      height: 1.85,
       weight: 85,
       proteinMultiplier: 1.8,
       calorieTarget: 2350
@@ -129,8 +131,21 @@ const DEFAULT_USER_PROFILES = [
   },
   {
     user: {
+      slug: 'giannis',
+      full_name: 'Giannis',
+      height: 1.86,
+      weight: 100,
+      proteinMultiplier: 1.7,
+      calorieTarget: 2500
+    },
+    meals: [],
+    items: []
+  },
+  {
+    user: {
       slug: 'admin123123',
       full_name: 'Admin',
+      height: 1.8,
       weight: 80,
       proteinMultiplier: 1.7,
       calorieTarget: 2200
@@ -304,8 +319,14 @@ async function ensureSchema() {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           slug TEXT NOT NULL UNIQUE,
           full_name TEXT NOT NULL,
+          height DOUBLE PRECISION,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+      `);
+
+      await pool.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS height DOUBLE PRECISION;
       `);
 
       await pool.query(`
@@ -449,17 +470,24 @@ async function ensureSchema() {
           const items = Array.isArray(profile?.items) ? profile.items : [];
 
           const userResult = await pool.query(
-            `INSERT INTO users (slug, full_name)
-             VALUES ($1, $2)
+            `INSERT INTO users (slug, full_name, height)
+             VALUES ($1, $2, $3)
              ON CONFLICT (slug)
              DO NOTHING
              RETURNING id`,
-            [baseUser.slug, baseUser.full_name]
+            [baseUser.slug, baseUser.full_name, baseUser.height]
           );
           const isNewUser = userResult.rowCount > 0;
           const userId = userResult.rows[0]?.id
             || (await pool.query('SELECT id FROM users WHERE slug = $1', [baseUser.slug])).rows[0]?.id;
           if (!userId) throw new Error(`failed_to_resolve_default_user_${baseUser.slug}`);
+
+          await pool.query(
+            `UPDATE users
+             SET height = $2
+             WHERE id = $1 AND height IS NULL`,
+            [userId, baseUser.height]
+          );
 
           if (!isNewUser) continue;
 
@@ -696,7 +724,7 @@ app.post('/api/food-images/upload', async (req, res) => {
 
 app.get('/api/users/:slug/dashboard', async (req, res) => {
   try {
-    const userRes = await pool.query('SELECT id, slug, full_name FROM users WHERE slug = $1', [req.params.slug]);
+    const userRes = await pool.query('SELECT id, slug, full_name, height FROM users WHERE slug = $1', [req.params.slug]);
     if (!userRes.rows[0]) {
       res.status(404).json({ error: 'user_not_found' });
       return;

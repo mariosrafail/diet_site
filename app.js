@@ -20,6 +20,7 @@
   goalProtein: document.getElementById('goalProtein'),
   applyTargets: document.getElementById('applyTargets'),
   heroTitle: document.querySelector('.hero h1'),
+  heroSubtitle: document.querySelector('.hero .subtitle'),
   userGate: document.getElementById('userGate'),
   userGateForm: document.getElementById('userGateForm'),
   userSlugInput: document.getElementById('userSlugInput'),
@@ -252,6 +253,24 @@ function updateActiveUserLabel() {
   if (!refs.activeUserLabel) return;
   const nameOrSlug = currentUserFullName || currentUserSlug || '-';
   refs.activeUserLabel.textContent = `User: ${nameOrSlug}`;
+}
+
+function formatUserMetric(value, suffix) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return '';
+  return `${number.toLocaleString('el-GR')} ${suffix}`;
+}
+
+function updateHeroSubtitle(user, targetsData) {
+  if (!refs.heroSubtitle) return;
+  const parts = [
+    formatUserMetric(user?.height, 'μ.'),
+    formatUserMetric(targetsData?.weight, 'κιλά')
+  ].filter(Boolean);
+
+  refs.heroSubtitle.textContent = parts.length
+    ? parts.join(', ')
+    : 'Προσωποποιημένο πλάνο διατροφής';
 }
 
 function setUserGateOpen(isOpen) {
@@ -1445,6 +1464,7 @@ async function loadDashboard() {
   updateActiveUserLabel();
 
   applyDashboardTargets(data.targets);
+  updateHeroSubtitle(data.user, data.targets);
 
   clearDashboardMealCards();
   const sweetCard = document.querySelector('.meal-card.sweet-card');
