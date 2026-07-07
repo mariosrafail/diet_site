@@ -120,8 +120,40 @@
     <section class="panel glass admin-users-panel">
       <div class="section-head">
         <h2>Χρήστες</h2>
-        <p>Επίλεξε χρήστη για επεξεργασία διατροφής στο index.</p>
+        <p>Δημιούργησε, διάγραψε ή άνοιξε χρήστη για επεξεργασία διατροφής στο index.</p>
       </div>
+
+      <form id="adminUserForm" class="admin-user-form">
+        <div class="food-db-form-grid">
+          <label>
+            <span>Slug</span>
+            <input id="userSlugInput" type="text" placeholder="π.χ. nikos" autocomplete="off" required />
+          </label>
+          <label>
+            <span>Όνομα</span>
+            <input id="userFullNameInput" type="text" placeholder="π.χ. Nikos" autocomplete="off" required />
+          </label>
+          <label>
+            <span>Ύψος</span>
+            <input id="userHeightInput" type="number" min="0" step="0.01" value="1.80" />
+          </label>
+          <label>
+            <span>Κιλά</span>
+            <input id="userWeightInput" type="number" min="1" step="0.1" value="80" required />
+          </label>
+          <label>
+            <span>Στόχος kcal</span>
+            <input id="userCaloriesInput" type="number" min="1" step="1" value="2200" required />
+          </label>
+          <label>
+            <span>Protein multiplier</span>
+            <input id="userProteinMultiplierInput" type="number" min="0.1" step="0.1" value="1.7" required />
+          </label>
+        </div>
+        <button class="btn btn-secondary" id="saveUserBtn" type="submit">Δημιουργία χρήστη</button>
+        <small id="adminUserStatus" class="mini-note"></small>
+      </form>
+
       <div id="adminUsersList" class="admin-users-list"></div>
     </section>
   </main>

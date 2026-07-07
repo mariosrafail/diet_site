@@ -1016,6 +1016,16 @@ select optgroup {
   gap: 10px;
 }
 
+.admin-user-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+}
+
 .admin-user-item {
   display: flex;
   justify-content: space-between;
@@ -1029,6 +1039,13 @@ select optgroup {
 
 .admin-user-meta {
   min-width: 0;
+}
+
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .admin-user-meta strong,
@@ -1095,6 +1112,15 @@ body.viewer-mode .food-row.row-locked .food-alt-wrap:not([hidden]) .alt-open-btn
 
   .admin-page .food-db-table-wrap {
     max-height: none;
+  }
+
+  .admin-user-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-user-actions {
+    justify-content: flex-start;
   }
 }
 

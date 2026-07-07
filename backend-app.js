@@ -221,6 +221,27 @@ function normalizeFood(input) {
   };
 }
 
+function normalizeUserSlug(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function normalizeUserPayload(input) {
+  return {
+    slug: normalizeUserSlug(input.slug),
+    full_name: String(input.full_name || input.fullName || '').trim(),
+    height: Number(input.height || 0) || null,
+    weight: Number(input.weight || 0),
+    calorie_target: Number(input.calorie_target || input.calorieTarget || 0),
+    protein_multiplier: Number(input.protein_multiplier || input.proteinMultiplier || 0)
+  };
+}
+
 function normalizeUploadBaseName(raw) {
   const base = String(raw || '')
     .replace(/\.[^.]+$/, '')
@@ -566,13 +587,81 @@ app.get('/api/foods', async (_req, res) => {
 app.get('/api/users', async (_req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, slug, full_name
-       FROM users
+      `SELECT u.id, u.slug, u.full_name, u.height,
+              t.weight, t.calorie_target, t.protein_multiplier
+       FROM users u
+       LEFT JOIN user_targets t ON t.user_id = u.id
        ORDER BY slug ASC`
     );
     res.json(result.rows);
   } catch {
     res.status(500).json({ error: 'users_read_failed' });
+  }
+});
+
+app.post('/api/users', async (req, res) => {
+  const user = normalizeUserPayload(req.body || {});
+  if (!user.slug || !user.full_name) {
+    res.status(400).json({ error: 'slug_full_name_required' });
+    return;
+  }
+  if (!Number.isFinite(user.weight) || user.weight <= 0
+    || !Number.isFinite(user.calorie_target) || user.calorie_target <= 0
+    || !Number.isFinite(user.protein_multiplier) || user.protein_multiplier <= 0) {
+    res.status(400).json({ error: 'targets_required' });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const userResult = await client.query(
+      `INSERT INTO users (slug, full_name, height)
+       VALUES ($1, $2, $3)
+       RETURNING id, slug, full_name, height`,
+      [user.slug, user.full_name, user.height]
+    );
+    const createdUser = userResult.rows[0];
+
+    await client.query(
+      `INSERT INTO user_targets (user_id, calorie_target, protein_multiplier, weight)
+       VALUES ($1, $2, $3, $4)`,
+      [createdUser.id, Math.round(user.calorie_target), user.protein_multiplier, user.weight]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({
+      ...createdUser,
+      weight: user.weight,
+      calorie_target: Math.round(user.calorie_target),
+      protein_multiplier: user.protein_multiplier
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error?.code === '23505') {
+      res.status(409).json({ error: 'slug_exists' });
+      return;
+    }
+    res.status(500).json({ error: 'user_write_failed' });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM users
+       WHERE id = $1 AND slug <> 'admin123123'`,
+      [req.params.id]
+    );
+    if (!result.rowCount) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'user_delete_failed' });
   }
 });
 

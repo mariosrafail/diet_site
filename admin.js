@@ -35,7 +35,16 @@ const refs = {
   imagePreview: document.getElementById('imagePreview'),
   imagePreviewText: document.getElementById('imagePreviewText'),
   saveFoodDbBtn: document.getElementById('saveFoodDbBtn'),
-  adminUsersList: document.getElementById('adminUsersList')
+  adminUsersList: document.getElementById('adminUsersList'),
+  adminUserForm: document.getElementById('adminUserForm'),
+  userSlugInput: document.getElementById('userSlugInput'),
+  userFullNameInput: document.getElementById('userFullNameInput'),
+  userHeightInput: document.getElementById('userHeightInput'),
+  userWeightInput: document.getElementById('userWeightInput'),
+  userCaloriesInput: document.getElementById('userCaloriesInput'),
+  userProteinMultiplierInput: document.getElementById('userProteinMultiplierInput'),
+  saveUserBtn: document.getElementById('saveUserBtn'),
+  adminUserStatus: document.getElementById('adminUserStatus')
 };
 
 let foods = [];
@@ -45,6 +54,14 @@ let pendingLoadingCount = 0;
 
 function normalizeUserSlug(raw) {
   return String(raw || '').trim().toLowerCase();
+}
+
+function slugifyUserSlug(raw) {
+  return normalizeUserSlug(raw)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function hasAdminSession() {
@@ -114,6 +131,21 @@ async function fetchUsers() {
   if (!res.ok) throw new Error('users_fetch_failed');
   const data = await res.json();
   users = Array.isArray(data) ? data : [];
+}
+
+function formatUserTarget(user) {
+  const parts = [];
+  const calories = Number(user.calorie_target || 0);
+  const weight = Number(user.weight || 0);
+  const height = Number(user.height || 0);
+  const proteinMultiplier = Number(user.protein_multiplier || 0);
+
+  if (Number.isFinite(calories) && calories > 0) parts.push(`${calories} kcal`);
+  if (Number.isFinite(weight) && weight > 0) parts.push(`${weight.toLocaleString('el-GR')} κιλά`);
+  if (Number.isFinite(height) && height > 0) parts.push(`${height.toLocaleString('el-GR')} μ.`);
+  if (Number.isFinite(proteinMultiplier) && proteinMultiplier > 0) parts.push(`P x${proteinMultiplier.toLocaleString('el-GR')}`);
+
+  return parts.join(' · ');
 }
 
 function updateImagePreview() {
@@ -276,8 +308,14 @@ function renderUsersList() {
     strong.textContent = fullName || user.slug;
     const small = document.createElement('small');
     small.textContent = `slug: ${user.slug}`;
+    const targets = document.createElement('small');
+    targets.textContent = formatUserTarget(user);
     meta.appendChild(strong);
     meta.appendChild(small);
+    if (targets.textContent) meta.appendChild(targets);
+
+    const actions = document.createElement('div');
+    actions.className = 'admin-user-actions';
 
     const openBtn = document.createElement('button');
     openBtn.type = 'button';
@@ -288,10 +326,65 @@ function renderUsersList() {
       window.location.href = `index.html?managed_user=${slug}&admin=1`;
     });
 
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'mini-btn danger';
+    deleteBtn.textContent = 'Διαγραφή';
+    deleteBtn.addEventListener('click', async () => {
+      const label = String(user.full_name || user.slug || '').trim();
+      if (!window.confirm(`Να διαγραφεί ο χρήστης "${label}" και η διατροφή του;`)) return;
+      beginLoading('Διαγραφή χρήστη...');
+      try {
+        const res = await fetch(`${USERS_API_ENDPOINT}/${encodeURIComponent(user.id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('user_delete_failed');
+        await reloadData();
+      } catch (error) {
+        console.error(error);
+        if (refs.adminUserStatus) refs.adminUserStatus.textContent = 'Αποτυχία διαγραφής χρήστη.';
+      } finally {
+        endLoading();
+      }
+    });
+
+    actions.appendChild(openBtn);
+    actions.appendChild(deleteBtn);
     item.appendChild(meta);
-    item.appendChild(openBtn);
+    item.appendChild(actions);
     refs.adminUsersList.appendChild(item);
   });
+}
+
+function resetUserForm() {
+  refs.userSlugInput.value = '';
+  refs.userFullNameInput.value = '';
+  refs.userHeightInput.value = '1.80';
+  refs.userWeightInput.value = '80';
+  refs.userCaloriesInput.value = '2200';
+  refs.userProteinMultiplierInput.value = '1.7';
+}
+
+async function saveUser() {
+  const payload = {
+    slug: slugifyUserSlug(refs.userSlugInput.value),
+    full_name: refs.userFullNameInput.value.trim(),
+    height: Number(refs.userHeightInput.value || 0),
+    weight: Number(refs.userWeightInput.value || 0),
+    calorieTarget: Number(refs.userCaloriesInput.value || 0),
+    proteinMultiplier: Number(refs.userProteinMultiplierInput.value || 0)
+  };
+
+  if (refs.userSlugInput.value !== payload.slug) refs.userSlugInput.value = payload.slug;
+  if (!payload.slug || !payload.full_name || payload.weight <= 0 || payload.calorieTarget <= 0 || payload.proteinMultiplier <= 0) {
+    throw new Error('user_form_invalid');
+  }
+
+  const res = await fetch(USERS_API_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (res.status === 409) throw new Error('slug_exists');
+  if (!res.ok) throw new Error('user_save_failed');
 }
 
 async function saveFood() {
@@ -347,6 +440,28 @@ refs.saveFoodDbBtn.addEventListener('click', async () => {
   } catch (error) {
     console.error(error);
   } finally {
+    endLoading();
+  }
+});
+refs.adminUserForm?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (refs.adminUserStatus) refs.adminUserStatus.textContent = '';
+  if (refs.saveUserBtn) refs.saveUserBtn.disabled = true;
+  beginLoading('Δημιουργία χρήστη...');
+  try {
+    await saveUser();
+    resetUserForm();
+    await reloadData();
+    if (refs.adminUserStatus) refs.adminUserStatus.textContent = 'Ο χρήστης δημιουργήθηκε στη βάση.';
+  } catch (error) {
+    console.error(error);
+    if (refs.adminUserStatus) {
+      refs.adminUserStatus.textContent = error?.message === 'slug_exists'
+        ? 'Υπάρχει ήδη χρήστης με αυτό το slug.'
+        : 'Συμπλήρωσε σωστά τα στοιχεία χρήστη.';
+    }
+  } finally {
+    if (refs.saveUserBtn) refs.saveUserBtn.disabled = false;
     endLoading();
   }
 });
