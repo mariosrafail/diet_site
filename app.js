@@ -36,6 +36,9 @@
   installAppHint: document.getElementById('installAppHint')
 };
 
+const exportButtons = [document.getElementById('exportPdfBtn'), document.getElementById('exportImageBtn')].filter(Boolean);
+const exportStatus = document.getElementById('exportStatus');
+
 const dockRefs = {
   totalCalories: document.getElementById('totalCaloriesDock'),
   totalProtein: document.getElementById('totalProteinDock'),
@@ -593,6 +596,65 @@ function calculateMacroShares(totals) {
     carbs: round(((totals.carbs * 4) / totals.calories) * 100),
     fat: round(((totals.fat * 9) / totals.calories) * 100)
   };
+}
+
+function collectDietExportData() {
+  syncMealSelectionControls();
+  updatePrepNotes();
+  const sumRows = rows => rows.reduce((sum, row) => {
+    for (const key of ['calories', 'protein', 'carbs', 'fat']) sum[key] += row[key];
+    return sum;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const meals = getActiveMealCardsForTotals().map(card => {
+    const rows = Array.from(card.querySelectorAll('.food-row.editable')).map(row => {
+      const qty = Number(row.querySelector('.qty-box input')?.value || 0);
+      const factor = getRowFactor(row, qty);
+      return {
+        name: row.querySelector('.food-main label')?.textContent?.trim() || 'Τρόφιμο',
+        note: [row.querySelector('.food-main small')?.textContent?.trim(), row.querySelector('.prep-note')?.textContent?.trim()].filter(Boolean).join(' / '),
+        qty,
+        unit: normalizeUnit(row.querySelector('.qty-box span')?.textContent || 'g'),
+        calories: Number(row.dataset.cal || 0) * factor,
+        protein: Number(row.dataset.protein || 0) * factor,
+        carbs: Number(row.dataset.carbs || 0) * factor,
+        fat: Number(row.dataset.fat || 0) * factor
+      };
+    }).filter(row => Number.isFinite(row.qty) && row.qty > 0);
+    return {
+      title: card.querySelector('.meal-top h3')?.textContent?.trim() || 'Γεύμα',
+      description: card.querySelector('.meal-top p')?.textContent?.trim() || '',
+      rows,
+      totals: sumRows(rows)
+    };
+  }).filter(meal => meal.rows.length);
+  return {
+    name: currentUserFullName || currentUserSlug,
+    slug: currentUserSlug,
+    date: new Date(),
+    targets: { ...targets },
+    totals: sumRows(meals.flatMap(meal => meal.rows)),
+    meals
+  };
+}
+
+async function exportCurrentDiet(format) {
+  if (!currentUserSlug || exportButtons.some(button => button.disabled)) return;
+  exportButtons.forEach(button => { button.disabled = true; });
+  exportStatus.dataset.error = 'false';
+  exportStatus.textContent = 'Ετοιμάζουμε το πλάνο σου...';
+  try {
+    await applyTargets({ persistRemote: false });
+    const data = collectDietExportData();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const files = await DietExport.exportPlan(data, format);
+    exportStatus.textContent = files > 1 ? `Έτοιμο! Το πλάνο εξήχθη σε ${files} εικόνες.` : `Έτοιμο! Ξεκίνησε η λήψη ${format === 'pdf' ? 'του PDF' : 'της εικόνας'}.`;
+  } catch (error) {
+    console.error('Diet export failed:', error);
+    exportStatus.dataset.error = 'true';
+    exportStatus.textContent = error.message || 'Η εξαγωγή απέτυχε. Δοκίμασε ξανά.';
+  } finally {
+    exportButtons.forEach(button => { button.disabled = false; });
+  }
 }
 
 function updateMealCalories() {
@@ -1531,6 +1593,8 @@ refs.applyTargets?.addEventListener('click', () => {
   if (!canEditPlan()) return;
   applyTargets();
 });
+document.getElementById('exportPdfBtn')?.addEventListener('click', () => exportCurrentDiet('pdf'));
+document.getElementById('exportImageBtn')?.addEventListener('click', () => exportCurrentDiet('image'));
 refs.proteinMultiplier?.addEventListener('change', () => {
   scheduleAutoSaveTargets(120);
 });

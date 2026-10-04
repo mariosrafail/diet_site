@@ -85,6 +85,14 @@
         <h2>Ημερήσιο πλάνο με εναλλακτικές</h2>
         <p>Κάθε βασικό τρόφιμο έχει δίπλα ισοδύναμες επιλογές, στο ίδιο στυλ με τα screenshot</p>
       </div>
+      <div class="export-toolbar">
+        <div><strong>Πάρε το πλάνο μαζί σου</strong><p>Τα επιλεγμένα γεύματα, οι τρέχουσες ποσότητες και τα σύνολά σου, σε καθαρή μορφή.</p></div>
+        <div class="export-actions">
+          <button type="button" class="btn" id="exportPdfBtn">Λήψη PDF</button>
+          <button type="button" class="btn" id="exportImageBtn">Λήψη εικόνας</button>
+        </div>
+        <p id="exportStatus" class="export-status" role="status" aria-live="polite"></p>
+      </div>
 
       <div class="meal-card" data-meal="breakfast">
         <div class="meal-top">
@@ -329,6 +337,7 @@
       <small id="userGateError" class="user-gate-error" hidden>Δεν βρέθηκε χρήστης με αυτό το slug.</small>
     </div>
   </div>
+  <script src="diet-export.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

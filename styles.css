@@ -593,6 +593,15 @@ select optgroup {
 .sweet-grid strong { display: block; margin-bottom: 8px; }
 .totals-grid { grid-template-columns: repeat(4, 1fr); }
 .totals-caption, .progress-caption { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 12px 0 0; }
+.export-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 24px; padding: 18px; margin-bottom: 22px; border: 1px solid var(--stroke); border-radius: 18px; background: rgba(110,231,183,0.04); }
+.export-toolbar > div:first-child { flex: 1 1 260px; }
+.export-toolbar strong { font-size: 15px; }
+.export-toolbar p { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 5px 0 0; }
+.export-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.export-actions .btn { margin: 0; }
+.export-toolbar .export-status { flex-basis: 100%; margin: 0; }
+.export-status:empty { display: none; }
+.export-status[data-error="true"] { color: #fca5a5; }
 .progress-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
 .progress-item { min-width: 0; padding: 18px; border: 1px solid var(--stroke); border-radius: 18px; background: rgba(255,255,255,0.025); }
 .progress-label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: space-between; margin-bottom: 12px; }
