@@ -243,7 +243,7 @@
     <section class="panel glass live-panel">
       <div class="section-head">
         <h2>Live σύνολο ημέρας</h2>
-        <p>Άλλαζε ποσότητες και δες αν βγαίνει το πλάνο</p>
+        <p>Δες τι έχεις συμπληρώσει και πόσο απέχεις από τους στόχους σου</p>
       </div>
       <div class="totals-grid">
         <div class="total-box"><span>Θερμίδες</span><strong id="totalCalories">0</strong></div>
@@ -251,24 +251,30 @@
         <div class="total-box"><span>Υδατάνθρακες</span><strong id="totalCarbs">0 g</strong></div>
         <div class="total-box"><span>Λιπαρά</span><strong id="totalFat">0 g</strong></div>
       </div>
+      <p class="totals-caption">Τα ποσοστά δίπλα στα γραμμάρια δείχνουν την αναλογία στις θερμίδες του πλάνου σου.</p>
       <div class="progress-wrap">
         <div class="progress-item">
-          <div class="progress-label"><span>Θερμίδες</span><span id="calorieStatus">0%</span></div>
+          <div class="progress-label"><strong>Θερμίδες</strong><span class="progress-status" id="calorieStatus">0%</span></div>
+          <p class="progress-goal" id="calorieGoalLabel">Ημερήσιος στόχος θερμίδων</p>
           <div class="bar"><div id="calorieBar"></div></div>
         </div>
         <div class="progress-item">
-          <div class="progress-label"><span id="proteinGoalLabel">Πρωτεΐνη</span><span id="proteinStatus">0%</span></div>
+          <div class="progress-label"><strong>Πρωτεΐνη</strong><span class="progress-status" id="proteinStatus">0%</span></div>
+          <p class="progress-goal" id="proteinGoalLabel">Στόχος πρωτεΐνης</p>
           <div class="bar"><div id="proteinBar"></div></div>
         </div>
         <div class="progress-item">
-          <div class="progress-label"><span>Λιπαρά (στόχος 25-30%)</span><span id="fatStatus">0%</span></div>
+          <div class="progress-label"><strong>Λιπαρά</strong><span class="progress-status" id="fatStatus">0%</span></div>
+          <p class="progress-goal" id="fatGoalLabel">Στόχος λιπαρών</p>
           <div class="bar"><div id="fatBar"></div></div>
         </div>
         <div class="progress-item">
-          <div class="progress-label"><span>Υδατάνθρακες (στόχος 35-45%)</span><span id="carbsStatus">0%</span></div>
+          <div class="progress-label"><strong>Υδατάνθρακες</strong><span class="progress-status" id="carbsStatus">0%</span></div>
+          <p class="progress-goal" id="carbsGoalLabel">Στόχος υδατανθράκων</p>
           <div class="bar"><div id="carbsBar"></div></div>
         </div>
       </div>
+      <p class="progress-caption">Οι μπάρες βασίζονται στον ημερήσιο στόχο θερμίδων. Για λιπαρά και υδατάνθρακες γεμίζουν στο κάτω όριο του εύρους.</p>
       <div id="feedbackBox" class="feedback-box"></div>
     </section>
 

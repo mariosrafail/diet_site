@@ -8,8 +8,11 @@
   fatBar: document.getElementById('fatBar'),
   carbsBar: document.getElementById('carbsBar'),
   calorieStatus: document.getElementById('calorieStatus'),
+  calorieGoalLabel: document.getElementById('calorieGoalLabel'),
   proteinStatus: document.getElementById('proteinStatus'),
   proteinGoalLabel: document.getElementById('proteinGoalLabel'),
+  fatGoalLabel: document.getElementById('fatGoalLabel'),
+  carbsGoalLabel: document.getElementById('carbsGoalLabel'),
   fatStatus: document.getElementById('fatStatus'),
   carbsStatus: document.getElementById('carbsStatus'),
   feedbackBox: document.getElementById('feedbackBox'),
@@ -753,32 +756,41 @@ function updateUI() {
   refs.totalCarbs.textContent = `${totals.carbs} g (${shares.carbs}%)`;
   refs.totalFat.textContent = `${totals.fat} g (${shares.fat}%)`;
 
-  const calPct = Math.min(140, round((totals.calories / targets.calories) * 100));
-  const proteinPct = Math.min(140, round((totals.protein / targets.protein) * 100));
+  const calPct = round((totals.calories / targets.calories) * 100);
+  const proteinPct = round((totals.protein / targets.protein) * 100);
   const fatMin = 25;
   const fatMax = 30;
   const carbsMin = 35;
   const carbsMax = 45;
-  const inRangeFill = (value, min, max) => {
-    if (value >= min && value <= max) return 100;
-    if (value < min) return Math.max(0, Math.min(100, round((value / min) * 100)));
-    return Math.max(0, Math.min(100, round((max / value) * 100)));
+  const updateMacroProgress = (grams, kcalPerGram, min, max, label, bar, status) => {
+    const minGrams = targets.calories * min / 100 / kcalPerGram;
+    const maxGrams = targets.calories * max / 100 / kcalPerGram;
+    const fill = minGrams > 0 ? Math.max(0, Math.min(100, round(grams / minGrams * 100))) : 0;
+    if (label) label.textContent = `${grams} g / ${round(minGrams)}–${round(maxGrams)} g · ${min}–${max}% των ${targets.calories} kcal`;
+    bar.style.width = `${fill}%`;
+    const state = grams < minGrams ? 'below' : grams > maxGrams ? 'above' : 'within';
+    bar.dataset.state = status.dataset.state = state;
+    if (state === 'below') status.textContent = `Μένουν ${round(minGrams - grams)} g`;
+    else if (state === 'above') status.textContent = `+${round(grams - maxGrams)} g πάνω από το εύρος`;
+    else status.textContent = 'Εντός στόχου';
   };
 
   refs.calorieBar.style.width = `${Math.min(calPct, 100)}%`;
   refs.proteinBar.style.width = `${Math.min(proteinPct, 100)}%`;
-  refs.fatBar.style.width = `${inRangeFill(shares.fat, fatMin, fatMax)}%`;
-  refs.carbsBar.style.width = `${inRangeFill(shares.carbs, carbsMin, carbsMax)}%`;
+  updateMacroProgress(totals.fat, 9, fatMin, fatMax, refs.fatGoalLabel, refs.fatBar, refs.fatStatus);
+  updateMacroProgress(totals.carbs, 4, carbsMin, carbsMax, refs.carbsGoalLabel, refs.carbsBar, refs.carbsStatus);
 
   const proteinRemaining = round(targets.protein - totals.protein);
 
-  if (refs.proteinGoalLabel) refs.proteinGoalLabel.textContent = `Πρωτεΐνη (στόχος ${targets.protein} g)`;
-  refs.calorieStatus.textContent = `${calPct}%`;
-  if (proteinRemaining > 0) refs.proteinStatus.textContent = `${proteinPct}% · μένουν ${proteinRemaining} g`;
-  else if (proteinRemaining < 0) refs.proteinStatus.textContent = `${proteinPct}% · +${Math.abs(proteinRemaining)} g`;
-  else refs.proteinStatus.textContent = `${proteinPct}% · στόχος`;
-  refs.fatStatus.textContent = `${shares.fat}%`;
-  refs.carbsStatus.textContent = `${shares.carbs}%`;
+  if (refs.calorieGoalLabel) refs.calorieGoalLabel.textContent = `${totals.calories} / ${targets.calories} kcal · ${calPct}%`;
+  if (refs.proteinGoalLabel) refs.proteinGoalLabel.textContent = `${totals.protein} / ${targets.protein} g · ${proteinPct}%`;
+  const calorieRemaining = round(targets.calories - totals.calories);
+  refs.calorieBar.dataset.state = refs.calorieStatus.dataset.state = calorieRemaining > 0 ? 'below' : calorieRemaining < 0 ? 'above' : 'within';
+  refs.proteinBar.dataset.state = refs.proteinStatus.dataset.state = proteinRemaining > 0 ? 'below' : 'within';
+  refs.calorieStatus.textContent = calorieRemaining > 0 ? `Μένουν ${calorieRemaining} kcal` : calorieRemaining < 0 ? `+${Math.abs(calorieRemaining)} kcal πάνω από τον στόχο` : 'Στόχος επιτεύχθηκε';
+  if (proteinRemaining > 0) refs.proteinStatus.textContent = `Μένουν ${proteinRemaining} g`;
+  else if (proteinRemaining < 0) refs.proteinStatus.textContent = `Στόχος επιτεύχθηκε · +${Math.abs(proteinRemaining)} g`;
+  else refs.proteinStatus.textContent = 'Στόχος επιτεύχθηκε';
 
   if (refs.feedbackBox) {
     refs.feedbackBox.textContent = '';

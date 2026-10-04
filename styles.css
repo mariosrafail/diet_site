@@ -592,8 +592,17 @@ select optgroup {
 .sweet-grid article { padding: 16px; border-radius: 18px; background: rgba(255,255,255,0.05); }
 .sweet-grid strong { display: block; margin-bottom: 8px; }
 .totals-grid { grid-template-columns: repeat(4, 1fr); }
-.progress-wrap { display: grid; gap: 14px; margin-top: 18px; }
-.progress-label { display: flex; justify-content: space-between; color: var(--muted); margin-bottom: 8px; }
+.totals-caption, .progress-caption { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 12px 0 0; }
+.progress-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+.progress-item { min-width: 0; padding: 18px; border: 1px solid var(--stroke); border-radius: 18px; background: rgba(255,255,255,0.025); }
+.progress-label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: space-between; margin-bottom: 12px; }
+.progress-label strong { font-size: 15px; }
+.progress-status { border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 600; line-height: 1.4; color: #93c5fd; background: rgba(96,165,250,0.1); }
+.progress-status[data-state="within"] { color: #6ee7b7; background: rgba(110,231,183,0.1); }
+.progress-status[data-state="above"] { color: #fcd34d; background: rgba(252,211,77,0.1); }
+.progress-goal { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0 0 14px; font-variant-numeric: tabular-nums; }
+.live-panel .total-box { min-width: 0; }
+.live-panel .total-box strong { font-size: clamp(18px, 2vw, 28px); overflow-wrap: anywhere; }
 .bar {
   width: 100%; height: 12px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden;
 }
@@ -601,6 +610,7 @@ select optgroup {
   width: 0; height: 100%; border-radius: inherit; transition: width .35s ease;
   background: linear-gradient(90deg, var(--accent-2), var(--accent));
 }
+.bar > div[data-state="above"] { background: linear-gradient(90deg, #fbbf24, #fcd34d); }
 .feedback-box {
   margin-top: 18px; padding: 16px 18px; border-radius: 18px; background: rgba(255,255,255,0.05); min-height: 58px; color: #eef4ff;
 }
@@ -705,6 +715,11 @@ select optgroup {
   .food-row.row-locked .food-alt-wrap .alt-menu { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
+  .progress-wrap { grid-template-columns: 1fr; }
+  .progress-item { padding: 15px; }
+  .live-panel .totals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live-panel .total-box { padding: 14px; }
+  .live-panel .total-box strong { font-size: 18px; }
   .hero, .panel { padding: 18px; border-radius: 22px; }
   .hero-brand img { width: 84px; height: 84px; border-radius: 14px; }
   .metric-grid, .grocery-grid, .totals-grid, .sweet-grid, .controls-grid, .macro-targets { grid-template-columns: 1fr; }
