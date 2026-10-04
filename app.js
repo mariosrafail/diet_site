@@ -1396,7 +1396,17 @@ function applyDashboardTargets(targetsData) {
   const proteinMultiplier = Number(targetsData.proteinMultiplier);
   const weight = Number(targetsData.weight);
   if (Number.isFinite(calorieTarget)) refs.calorieTargetInput.value = String(calorieTarget);
-  if (Number.isFinite(proteinMultiplier)) refs.proteinMultiplier.value = String(proteinMultiplier);
+  if (Number.isFinite(proteinMultiplier) && proteinMultiplier > 0) {
+    let option = Array.from(refs.proteinMultiplier.options)
+      .find(item => Number(item.value) === proteinMultiplier);
+    if (!option) {
+      option = document.createElement('option');
+      option.value = String(proteinMultiplier);
+      option.textContent = String(proteinMultiplier);
+      refs.proteinMultiplier.appendChild(option);
+    }
+    refs.proteinMultiplier.value = option.value;
+  }
   if (Number.isFinite(weight)) refs.weightInput.value = String(weight);
 }
 
